@@ -10,20 +10,37 @@ final class TextRecognition {
     func performTextRecognition(cgImage: CGImage) async {
         let requestHandler = VNImageRequestHandler(cgImage: cgImage)
         let request = VNRecognizeTextRequest() { (request: VNRequest, error: Error?) in
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
+            guard var observations = request.results as? [VNRecognizedTextObservation] else {
                 return
             }
             
-            
-            let recognizedStrings = observations.compactMap { observation  in
-                return observation.topCandidates(1).first
-            }
-            
-            for string in recognizedStrings {
-                print(string.string
+            observations.sort { l, r in
+                if l.boundingBox.size.height > r.boundingBox.size.height {
+                    return true
+                }
                 
-                )
+                if l.boundingBox.size.height == r.boundingBox.size.height {
+                    return l.boundingBox.size.width > r.boundingBox.width
+                }
+                
+                return false
             }
+            
+            for observation in observations {
+                let size = observation.boundingBox.size
+                let text = observation.topCandidates(1).first
+                print("box size: \(size) text: \(text?.string)")
+            }
+            
+            
+            
+//            let recognizedStrings = observations.compactMap { observation  in
+//                return observation.topCandidates(1).first
+//            }
+//            
+//            for string in recognizedStrings {
+//                print(string.string)
+//            }
         }
         
         do {

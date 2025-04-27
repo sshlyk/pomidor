@@ -3,11 +3,10 @@ import UIKit
 
 struct Helpers {
     
-    static func loadScreenshot(name: String) -> CGImage? {
+    static func loadScreenshot(name: String, withExtension extenstion: String) -> CGImage? {
         let bundle = Bundle(for: PomidorTests.self)
-        let path = bundle.bundlePath
             
-        guard let img = bundle.url(forResource: name, withExtension: "png") else {
+        guard let img = bundle.url(forResource: name, withExtension: extenstion) else {
             return nil
         }
         
