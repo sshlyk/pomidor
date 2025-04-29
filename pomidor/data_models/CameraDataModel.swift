@@ -10,8 +10,10 @@ final class CameraDataModel: ObservableObject {
     
     @Published var viewfinderImage: Image?
     @Published var thumbnailImage: Image?
+    @Published var textBoxes: TextBoxes
     
     init() {
+        textBoxes = TextBoxes()
         Task { await handleCameraPreviews() }
         Task { await handleCameraPhotos() }
     }
@@ -19,7 +21,7 @@ final class CameraDataModel: ObservableObject {
     func handleCameraPreviews() async {
         for await nextFrame in camera.previewStream {
             guard let frame = nextFrame.image else { continue }
-            
+
             Task { @MainActor in
                 viewfinderImage = frame
             }
@@ -27,19 +29,43 @@ final class CameraDataModel: ObservableObject {
     }
     
     func handleCameraPhotos() async {
-//        let unpackedPhotoStream = camera.photoStream
-//            .compactMap { self.unpackPhoto($0) }
         
         for await capturedPhoto in camera.photoStream {
+            defer {
+                camera.resume()
+            }
+        
+            
+            guard let metadataOrientation = capturedPhoto.metadata[String(kCGImagePropertyOrientation)] as? UInt32,
+                  let cgImageOrientation = CGImagePropertyOrientation(rawValue: metadataOrientation) else {
+                return
+            }
+            
             guard let cgImage = capturedPhoto.cgImageRepresentation() else { continue }
             
-            await textRecogntion.performTextRecognition(cgImage: cgImage)
+            Task { @MainActor in
+                viewfinderImage = Image(uiImage: UIImage(
+                    cgImage: cgImage,
+                    scale: 1,
+                    orientation: UIImage.Orientation(cgImageOrientation)
+                ))
+            }
             
-//            Task { @MainActor in
-//                thumbnailImage = photoData.thumbnailImage
-//            }
+            let boxes = textRecogntion.performTextRecognition(cgImage: cgImage, orientation: cgImageOrientation)
+            logger.info("Found \(boxes.count) text boxes")
+            
+            Task { @MainActor in
+                textBoxes.boxes = boxes.map {NormalizedTextBox($0)}
+            }
+            
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            
+            Task { @MainActor in
+                textBoxes.boxes = []
+            }
         }
     }
+
 }
 
 fileprivate extension CIImage {
@@ -62,6 +88,22 @@ fileprivate extension Image.Orientation {
         case .leftMirrored: self = .leftMirrored
         case .right: self = .right
         case .rightMirrored: self = .rightMirrored
+        }
+    }
+}
+
+fileprivate extension UIImage.Orientation {
+    
+    init(_ cgImageOrientation: CGImagePropertyOrientation) {
+        switch cgImageOrientation {
+        case .up: self = .up
+        case .upMirrored: self = .upMirrored
+        case .down: self = .down
+        case .downMirrored: self = .downMirrored
+        case .leftMirrored: self = .leftMirrored
+        case .right: self = .right
+        case .rightMirrored: self = .rightMirrored
+        case .left: self = .left
         }
     }
 }

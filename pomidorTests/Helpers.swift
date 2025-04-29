@@ -3,7 +3,7 @@ import UIKit
 
 struct Helpers {
     
-    static func loadScreenshot(name: String, withExtension extenstion: String) -> CGImage? {
+    static func loadScreenshot(name: String, withExtension extenstion: String) -> UIImage? {
         let bundle = Bundle(for: PomidorTests.self)
             
         guard let img = bundle.url(forResource: name, withExtension: extenstion) else {
@@ -14,7 +14,7 @@ struct Helpers {
             return nil
         }
         
-        return UIImage.init(data: imgData)?.cgImage
+        return UIImage.init(data: imgData)
     }
     
 }

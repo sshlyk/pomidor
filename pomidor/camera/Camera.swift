@@ -66,13 +66,13 @@ class Camera: NSObject {
         let availableCaptureDevices = backCaptureDevices.filter { $0.isConnected && !$0.isSuspended }
         captureDevice = availableCaptureDevices.first ?? AVCaptureDevice.default(for: .video)
         
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(updateForDeviceOrientation),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil
-        )
+//        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+//        NotificationCenter.default.addObserver(
+//            self,
+//            selector: #selector(updateForDeviceOrientation),
+//            name: UIDevice.orientationDidChangeNotification,
+//            object: nil
+//        )
     }
     
     private func configureCaptureSession(completionHandler: (_ success: Bool) -> Void) {
@@ -219,13 +219,13 @@ class Camera: NSObject {
     }
 
     private var deviceOrientation: UIDeviceOrientation {
-        var orientation = UIDevice.current.orientation
-        if orientation == UIDeviceOrientation.unknown {
-            orientation = UIScreen.main.orientation
-        }
-        return orientation
-//        // Only support portrait orientation
-//        return UIDeviceOrientation.portrait
+//        var orientation = UIDevice.current.orientation
+//        if orientation == UIDeviceOrientation.unknown {
+//            orientation = UIScreen.main.orientation
+//        }
+//        return orientation
+        // Only support portrait orientation
+        return UIDeviceOrientation.portrait
     }
     
     @objc
@@ -246,6 +246,8 @@ class Camera: NSObject {
     func captureImage() {
         guard let photoOutput = self.photoOutput else { return }
         
+        pause()
+        
         sessionQueue.async {
         
             var photoSettings = AVCapturePhotoSettings()
@@ -257,9 +259,9 @@ class Camera: NSObject {
             let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
             photoSettings.flashMode = isFlashAvailable ? .auto : .off
             photoSettings.isHighResolutionPhotoEnabled = true
-            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
-                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
-            }
+//            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
+//                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
+//            }
             photoSettings.photoQualityPrioritization = .quality
             
             if let photoOutputVideoConnection = photoOutput.connection(with: .video) {
@@ -270,6 +272,18 @@ class Camera: NSObject {
             }
             
             photoOutput.capturePhoto(with: photoSettings, delegate: self)
+        }
+    }
+    
+    func pause() {
+        sessionQueue.async {
+            self.isPreviewPaused = true
+        }
+    }
+    
+    func resume() {
+        sessionQueue.async {
+            self.isPreviewPaused = false
         }
     }
 }

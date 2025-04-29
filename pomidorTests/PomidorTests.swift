@@ -23,8 +23,7 @@ class PomidorTests {
         
         let dataModel = pomidor.TextRecognition()
         
-        await dataModel.performTextRecognition(cgImage: screenshot)
+        let heatMap = dataModel.performTextRecognition(cgImage: screenshot.cgImage!, orientation: .up)
+        
     }
-
-
 }
