@@ -13,7 +13,8 @@ class Camera: NSObject {
     
     private var backCaptureDevices: [AVCaptureDevice] {
         AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInTrueDepthCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInWideAngleCamera, .builtInDualWideCamera],
+            // it is probably best to try camera with optical zoom first. if not found, system default camera is used
+            deviceTypes: [.builtInTelephotoCamera],
             mediaType: .video,
             position: .back
         ).devices

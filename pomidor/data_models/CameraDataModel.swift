@@ -7,18 +7,20 @@ fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
 final class CameraDataModel: ObservableObject {
     private let camera = Camera()
-    let textRecogntion = TextRecognition()
-    let titleTrackingModel: VNCoreMLModel?
-
-    var previewTittleTrackingFramesSkipped = 0
+    private let textRecogntion = TextRecognition()
+    private let titleTrackingModel: VNCoreMLModel?
+    private var previewTittleTrackingFramesSkipped = 0
+    private let 🤷 = "🤷‍♂️"
     
     @Published var viewfinderImage: Image?
     @Published var thumbnailImage: Image?
     @Published var textBoxes: TextBoxes
+    @Published var movieName: String
     
     init() {
         titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
         textBoxes = TextBoxes()
+        movieName = 🤷
         Task { await handleCameraPreviews() }
         Task { await handleCameraPhotos() }
     }
@@ -102,10 +104,15 @@ final class CameraDataModel: ObservableObject {
             if let movieBox = titleBox {
                 Task { @MainActor in
                     textBoxes.boxes = [NormalizedTextBox(movieBox)]
+                    movieName = "movie name goes here"
                 }
             }
             
             try? await Task.sleep(nanoseconds: 3_000_000_000)
+            Task { @MainActor in
+                movieName = ""
+            }
+            
         }
     }
     

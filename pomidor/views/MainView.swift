@@ -9,7 +9,7 @@ struct MainView: View {
         
         NavigationStack {
             GeometryReader { geometry in
-                ViewfinderView(image:  $model.viewfinderImage, boxes: model.textBoxes )
+                ViewfinderView(image:  $model.viewfinderImage, boxes: model.textBoxes, movieTitle: $model.movieName)
                     .overlay(alignment: .bottom) {
                         buttonsView()
                             .frame(height: geometry.size.height * Self.barHeightFactor)
