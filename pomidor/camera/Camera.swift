@@ -246,8 +246,6 @@ class Camera: NSObject {
     func captureImage() {
         guard let photoOutput = self.photoOutput else { return }
         
-        pause()
-        
         sessionQueue.async {
         
             var photoSettings = AVCapturePhotoSettings()
@@ -265,6 +263,7 @@ class Camera: NSObject {
             photoSettings.photoQualityPrioritization = .quality
             
             if let photoOutputVideoConnection = photoOutput.connection(with: .video) {
+                photoOutputVideoConnection
                 if photoOutputVideoConnection.isVideoOrientationSupported,
                     let videoOrientation = self.videoOrientationFor(self.deviceOrientation) {
                     photoOutputVideoConnection.videoOrientation = videoOrientation

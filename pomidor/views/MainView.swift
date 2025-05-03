@@ -25,7 +25,7 @@ struct MainView: View {
                     .background(.black)
             }
             .task {
-                await model.camera.start()
+                await model.start()
             }
             .navigationTitle("Camera")
             .navigationBarTitleDisplayMode(.inline)
@@ -41,7 +41,7 @@ struct MainView: View {
             Spacer()
             
             Button {
-                model.camera.captureImage()
+                model.captureImage()
             } label: {
                 Label {
                     Text("Take Photo")

@@ -13,8 +13,8 @@ struct ViewfinderView: View {
                     box.stroke(.red, lineWidth: 2)
                 }
             }
-             //.scaledToFit()
-            .scaledToFill()
+            .scaledToFit()
+            //.scaledToFill()
             .frame(
                 width: geometry.size.width,
                 height: geometry.size.height

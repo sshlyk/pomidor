@@ -6,9 +6,10 @@ import Vision
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
 final class CameraDataModel: ObservableObject {
-    let camera = Camera()
+    private let camera = Camera()
     let textRecogntion = TextRecognition()
-    var titleTrackingMLRequest: VNCoreMLRequest?
+    let titleTrackingModel: VNCoreMLModel?
+
     var previewTittleTrackingFramesSkipped = 0
     
     @Published var viewfinderImage: Image?
@@ -16,29 +17,30 @@ final class CameraDataModel: ObservableObject {
     @Published var textBoxes: TextBoxes
     
     init() {
+        titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
         textBoxes = TextBoxes()
         Task { await handleCameraPreviews() }
         Task { await handleCameraPhotos() }
     }
     
+    func start() async {
+        await camera.start()
+    }
+    
+    func captureImage() {
+        textBoxes.boxes = [] // clear on-screen tracking
+        camera.pause() // pause viewfinder video so still picture does not feel jumping when ready
+        camera.captureImage()
+    }
+    
     // Video frames that are displayed in the viewfinder
     // Detect region of the screen that contains movie title
     func handleCameraPreviews() async {
-        if let model = try? MovieTitlePosition(configuration: .init()),
-           let visionModel = try? VNCoreMLModel(for: model.model) {
-            titleTrackingMLRequest = VNCoreMLRequest(model: visionModel) { request, error in
-                if let observations = request.results as? [VNRecognizedObjectObservation] {
-                    // publish detected boxes to be displayed
-                    Task { @MainActor in
-                        self.textBoxes.boxes = observations.map {NormalizedTextBox($0.boundingBox)}
-                    }
-                }
-              }
+        let titleTrackingMLRequest: VNCoreMLRequest? = createTitleTrackingRequest { observations in
+            Task { @MainActor in
+                self.textBoxes.boxes = observations.map {NormalizedTextBox($0.boundingBox)}
             }
-        
-        // image can be rotated or region of interest selected
-        //titleTrackingMLRequest?.imageCropAndScaleOption = .scaleFillRotate90CCW
-        //imagePreProcessingRequst?.regionOfInterest = ...
+        }
 
         for await nextFrame in camera.previewStream {
             guard let previewCgImage = nextFrame.cgImage else {
@@ -64,8 +66,15 @@ final class CameraDataModel: ObservableObject {
     }
     
     func handleCameraPhotos() async {
+        var titleBox: CGRect?
+        
+        let findTitleBoundingBox = createTitleTrackingRequest { observations in
+            titleBox = observations.first?.boundingBox
+        }
         
         for await capturedPhoto in camera.photoStream {
+
+            // when done processing photo, resume viewfinder and
             defer {
                 camera.resume()
             }
@@ -85,19 +94,37 @@ final class CameraDataModel: ObservableObject {
                 ))
             }
             
-            let boxes = textRecogntion.performTextRecognition(cgImage: cgImage, orientation: cgImageOrientation)
-            logger.info("Found \(boxes.count) text boxes")
+            // find bounding box for the movie title
+            if let request = findTitleBoundingBox {
+                try? VNImageRequestHandler(cgImage: cgImage, orientation: cgImageOrientation).perform([request])
+            }
             
-            Task { @MainActor in
-                textBoxes.boxes = boxes.map {NormalizedTextBox($0)}
+            if let movieBox = titleBox {
+                Task { @MainActor in
+                    textBoxes.boxes = [NormalizedTextBox(movieBox)]
+                }
             }
             
             try? await Task.sleep(nanoseconds: 3_000_000_000)
-            
-            Task { @MainActor in
-                textBoxes.boxes = []
+        }
+    }
+    
+    private func createTitleTrackingRequest(handler: @escaping ([VNRecognizedObjectObservation]) -> Void) -> VNCoreMLRequest?  {
+        var titleTrackingMLRequest: VNCoreMLRequest?
+        
+        if let model = titleTrackingModel {
+            titleTrackingMLRequest = VNCoreMLRequest(model: model) { request, error in
+                if let observations = request.results as? [VNRecognizedObjectObservation] {
+                    handler(observations)
+                }
             }
         }
+        
+        // image can be rotated or region of interest selected
+        //titleTrackingMLRequest?.imageCropAndScaleOption = .scaleFillRotate90CCW
+        //titleTrackingMLRequest?.regionOfInterest = ...
+        
+        return titleTrackingMLRequest
     }
 }
 
