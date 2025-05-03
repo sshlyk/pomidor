@@ -1,0 +1,366 @@
+[
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 274.01062500000006,
+          "width" : 1029.4790625,
+          "x" : 983.6760937500001,
+          "y" : 808.2900000000001
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0042.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 259.60731861130967,
+          "width" : 1282.848799753295,
+          "x" : 1016.218750909142,
+          "y" : 819.6223822859494
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0043.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 264.5255457202844,
+          "width" : 1269.4415779082817,
+          "x" : 977.5707255547615,
+          "y" : 790.3873238837748
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0044.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 361.47525544377555,
+          "width" : 872.7880052760456,
+          "x" : 728.3388449541659,
+          "y" : 683.5674734552863
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0045.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 360.1470453830347,
+          "width" : 884.0777907923423,
+          "x" : 707.7564013679764,
+          "y" : 686.1276464709172
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0046.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 347.4135532789764,
+          "width" : 903.7603239388269,
+          "x" : 692.1499331542724,
+          "y" : 714.044119522936
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0047.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 183.05237061759888,
+          "width" : 800.2561863068975,
+          "x" : 608.0684614830308,
+          "y" : 746.8595702627595
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0048.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 183.73572506913965,
+          "width" : 809.033922360489,
+          "x" : 586.1048719278828,
+          "y" : 729.4340317484757
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0049.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 214.59254720489983,
+          "width" : 1447.8452133132878,
+          "x" : 970.9585493828127,
+          "y" : 875.6622596675661
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0050.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 292.4468311275959,
+          "width" : 1443.8702078416509,
+          "x" : 975.9200876894206,
+          "y" : 850.5947009487305
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0051.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 342.31245666888515,
+          "width" : 1194.6479519516404,
+          "x" : 830.558083722987,
+          "y" : 834.0161369659336
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0052.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 318.99128701081133,
+          "width" : 1448.165328555986,
+          "x" : 877.8969798407888,
+          "y" : 915.2556370500083
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0053.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 340.4403644348089,
+          "width" : 1267.3941965182287,
+          "x" : 716.3508175528159,
+          "y" : 715.644685615806
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0054.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 268.52031676476355,
+          "width" : 1287.9644801782688,
+          "x" : 761.6466689666701,
+          "y" : 806.9144700515061
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0055.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 257.4323263108811,
+          "width" : 1228.0437646432472,
+          "x" : 1134.9767037155143,
+          "y" : 818.4147341230472
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0056.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 346.8631534257073,
+          "width" : 791.6629896568903,
+          "x" : 915.3759064777133,
+          "y" : 749.0063007290039
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0057.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 313.9246612358965,
+          "width" : 1425.2298962472703,
+          "x" : 1065.4380786527365,
+          "y" : 817.9319400181573
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0058.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 350.4434243159042,
+          "width" : 712.9838245183829,
+          "x" : 622.8352268314471,
+          "y" : 661.7453347597516
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0059.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 218.00594929580444,
+          "width" : 1135.954857625093,
+          "x" : 1128.1741890241406,
+          "y" : 1309.1071335831173
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0060.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 296.1860463708301,
+          "width" : 398.4624514674535,
+          "x" : 651.6075856217561,
+          "y" : 768.6381194435834
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0061.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 150.27373363671677,
+          "width" : 1450.2375459500092,
+          "x" : 1071.4323200673844,
+          "y" : 912.1690095704294
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0062.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 388.9476103441122,
+          "width" : 1001.9550825801799,
+          "x" : 812.6818031105671,
+          "y" : 766.4248610750981
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0063.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 237.61064474606417,
+          "width" : 1437.1207353250152,
+          "x" : 1158.4600259634874,
+          "y" : 831.3416818978037
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0064.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 274.0751612974327,
+          "width" : 1017.1766585163804,
+          "x" : 951.7319299718031,
+          "y" : 847.6210651424714
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0065.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 180.71688550911796,
+          "width" : 1443.5760722330974,
+          "x" : 1132.5573085381995,
+          "y" : 841.7570153965581
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0066.HEIC"
+  },
+  {
+    "annotation" : [
+      {
+        "coordinates" : {
+          "height" : 352.0599708693568,
+          "width" : 1012.6416487221313,
+          "x" : 917.9905891581299,
+          "y" : 846.3950935952221
+        },
+        "label" : "object"
+      }
+    ],
+    "imagefilename" : "IMG_0067.HEIC"
+  }
+]
