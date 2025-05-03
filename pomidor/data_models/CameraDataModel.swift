@@ -1,12 +1,15 @@
 import AVFoundation
 import SwiftUI
 import os.log
+import Vision
 
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
 final class CameraDataModel: ObservableObject {
     let camera = Camera()
     let textRecogntion = TextRecognition()
+    var titleTrackingMLRequest: VNCoreMLRequest?
+    var previewTittleTrackingFramesSkipped = 0
     
     @Published var viewfinderImage: Image?
     @Published var thumbnailImage: Image?
@@ -18,12 +21,44 @@ final class CameraDataModel: ObservableObject {
         Task { await handleCameraPhotos() }
     }
     
+    // Video frames that are displayed in the viewfinder
+    // Detect region of the screen that contains movie title
     func handleCameraPreviews() async {
-        for await nextFrame in camera.previewStream {
-            guard let frame = nextFrame.image else { continue }
+        if let model = try? MovieTitlePosition(configuration: .init()),
+           let visionModel = try? VNCoreMLModel(for: model.model) {
+            titleTrackingMLRequest = VNCoreMLRequest(model: visionModel) { request, error in
+                if let observations = request.results as? [VNRecognizedObjectObservation] {
+                    // publish detected boxes to be displayed
+                    Task { @MainActor in
+                        self.textBoxes.boxes = observations.map {NormalizedTextBox($0.boundingBox)}
+                    }
+                }
+              }
+            }
+        
+        // image can be rotated or region of interest selected
+        //titleTrackingMLRequest?.imageCropAndScaleOption = .scaleFillRotate90CCW
+        //imagePreProcessingRequst?.regionOfInterest = ...
 
+        for await nextFrame in camera.previewStream {
+            guard let previewCgImage = nextFrame.cgImage else {
+                return
+            }
+            
+            if previewTittleTrackingFramesSkipped > 2 {
+                // submit image for movie title tracking processing
+                if let request = titleTrackingMLRequest {
+                    try? VNImageRequestHandler(cgImage: previewCgImage).perform([request])
+                    previewTittleTrackingFramesSkipped = 0
+                }
+                
+            } else {
+                previewTittleTrackingFramesSkipped += 1
+            }
+            
             Task { @MainActor in
-                viewfinderImage = frame
+                // TODO orientation is fixed to up. This creates problems rendering boxes in landscape
+                viewfinderImage = Image(decorative: previewCgImage, scale: 1, orientation: .up)
             }
         }
     }
@@ -34,7 +69,6 @@ final class CameraDataModel: ObservableObject {
             defer {
                 camera.resume()
             }
-        
             
             guard let metadataOrientation = capturedPhoto.metadata[String(kCGImagePropertyOrientation)] as? UInt32,
                   let cgImageOrientation = CGImagePropertyOrientation(rawValue: metadataOrientation) else {
@@ -65,14 +99,13 @@ final class CameraDataModel: ObservableObject {
             }
         }
     }
-
 }
 
 fileprivate extension CIImage {
-    var image: Image? {
+    
+    var cgImage: CGImage? {
         let ciContext = CIContext()
-        guard let cgImage = ciContext.createCGImage(self, from: self.extent) else { return nil }
-        return Image(decorative: cgImage, scale: 1, orientation: .up)
+        return ciContext.createCGImage(self, from: self.extent)
     }
 }
 

@@ -4,8 +4,7 @@ struct MainView: View {
     @StateObject private var model = CameraDataModel()
  
     private static let barHeightFactor = 0.15
-    
-    
+        
     var body: some View {
         
         NavigationStack {

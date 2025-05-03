@@ -10,7 +10,7 @@ struct ViewfinderView: View {
             .resizable()
             .overlay {
                 ForEach($boxes.boxes) { $box in
-                    box.stroke(.red, lineWidth: 1)
+                    box.stroke(.red, lineWidth: 2)
                 }
             }
              //.scaledToFit()
