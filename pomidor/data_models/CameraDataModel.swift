@@ -38,31 +38,42 @@ final class CameraDataModel: ObservableObject {
     // Video frames that are displayed in the viewfinder
     // Detect region of the screen that contains movie title
     func handleCameraPreviews() async {
+        var detectionsBoxes: [CGRect]?
         let titleTrackingMLRequest: VNCoreMLRequest? = createTitleTrackingRequest { observations in
-            Task { @MainActor in
-                self.textBoxes.boxes = observations.map {NormalizedTextBox($0.boundingBox)}
-            }
+            detectionsBoxes = observations.map {$0.boundingBox}
         }
 
         for await nextFrame in camera.previewStream {
-            guard let previewCgImage = nextFrame.cgImage else {
+            guard let previewCgImage = nextFrame.image.cgImage else {
                 return
             }
             
             if previewTittleTrackingFramesSkipped > 2 {
                 // submit image for movie title tracking processing
                 if let request = titleTrackingMLRequest {
-                    try? VNImageRequestHandler(cgImage: previewCgImage).perform([request])
+                    if let cameraOrientation = nextFrame.cameraOrientation {
+                        try? VNImageRequestHandler(
+                            cgImage: previewCgImage,
+                            orientation: CGImagePropertyOrientation(cameraOrientation)
+                        ).perform([request])
+                        
+                        let adjustedToOrientationBoxes = detectionsBoxes?
+                            .map { $0.reAdjust(originalCameraOrientation: cameraOrientation) }
+                            .map { NormalizedTextBox($0) }
+                        
+                        Task { @MainActor in
+                            self.textBoxes.boxes = adjustedToOrientationBoxes ?? []
+                        }
+                    }
+                    
                     previewTittleTrackingFramesSkipped = 0
                 }
-                
             } else {
                 previewTittleTrackingFramesSkipped += 1
             }
             
             Task { @MainActor in
-                // TODO orientation is fixed to up. This creates problems rendering boxes in landscape
-                viewfinderImage = Image(decorative: previewCgImage, scale: 1, orientation: .up)
+                viewfinderImage = Image(decorative: previewCgImage, scale: 1, orientation: .right)
             }
         }
     }
@@ -75,7 +86,6 @@ final class CameraDataModel: ObservableObject {
         }
         
         for await capturedPhoto in camera.photoStream {
-
             // when done processing photo, resume viewfinder and
             defer {
                 camera.resume()
@@ -86,25 +96,18 @@ final class CameraDataModel: ObservableObject {
                 return
             }
             
-            guard let cgImage = capturedPhoto.cgImageRepresentation() else { continue }
-            
-            Task { @MainActor in
-                viewfinderImage = Image(uiImage: UIImage(
-                    cgImage: cgImage,
-                    scale: 1,
-                    orientation: UIImage.Orientation(cgImageOrientation)
-                ))
-            }
+            guard var cgImage = capturedPhoto.cgImageRepresentation() else { continue }
             
             // find bounding box for the movie title
             if let request = findTitleBoundingBox {
                 try? VNImageRequestHandler(cgImage: cgImage, orientation: cgImageOrientation).perform([request])
             }
             
-            if let movieBox = titleBox {
+            if let box = titleBox {
                 Task { @MainActor in
-                    textBoxes.boxes = [NormalizedTextBox(movieBox)]
-                    movieName = "movie name goes here"
+                    textBoxes.boxes = [NormalizedTextBox(box)]
+                    movieName = "some movie title"
+                    print(titleBox.debugDescription)
                 }
             }
             
@@ -171,6 +174,38 @@ fileprivate extension UIImage.Orientation {
         case .right: self = .right
         case .rightMirrored: self = .rightMirrored
         case .left: self = .left
+        }
+    }
+}
+
+// Image transformation needed relative to camera physical position when photo was taken to correctly pass it to ML
+fileprivate extension CGImagePropertyOrientation {
+    init(_ cameraOrientation: CameraOrientation) {
+        switch cameraOrientation {
+        case .up: self = .right
+        case .down: self = .left
+        case .right: self = .down
+        case .left: self = .up
+        }
+    }
+}
+
+fileprivate extension CGRect {
+    func reAdjust(originalCameraOrientation: CameraOrientation) -> CGRect {
+        switch originalCameraOrientation {
+        case .up: return self
+            
+        case .down: return CGRect(
+            origin: CGPoint(x: 1 - self.origin.x - self.width, y: 1 - self.origin.y - self.height),
+            size: self.size)
+            
+        case .right: return CGRect(
+            origin: CGPoint(x: 1 - self.origin.y - self.height, y: self.origin.x),
+            size: CGSize(width: self.height, height: self.width))
+            
+        case .left: return CGRect(
+                origin: CGPoint(x: self.origin.y, y: 1 - self.origin.x - self.width),
+                size: CGSize(width: self.height, height: self.width))
         }
     }
 }

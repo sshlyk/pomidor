@@ -10,6 +10,7 @@ class Camera: NSObject {
     private var photoOutput: AVCapturePhotoOutput?
     private var videoOutput: AVCaptureVideoDataOutput?
     private var sessionQueue: DispatchQueue!
+    private var cameraOrientation: CameraOrientation?
     
     private var backCaptureDevices: [AVCaptureDevice] {
         AVCaptureDevice.DiscoverySession(
@@ -36,14 +37,14 @@ class Camera: NSObject {
 
     private var addToPhotoStream: ((AVCapturePhoto) -> Void)?
     
-    private var addToPreviewStream: ((CIImage) -> Void)?
+    private var addToPreviewStream: ((PreviewCapture) -> Void)?
     
     var isPreviewPaused = false
     
-    lazy var previewStream: AsyncStream<CIImage> = AsyncStream { continuation in
-        addToPreviewStream = { ciImage in
+    lazy var previewStream: AsyncStream<PreviewCapture> = AsyncStream { continuation in
+        addToPreviewStream = { previewCapture in
             if !self.isPreviewPaused {
-                continuation.yield(ciImage)
+                continuation.yield(previewCapture)
             }
         }
     }
@@ -67,13 +68,13 @@ class Camera: NSObject {
         let availableCaptureDevices = backCaptureDevices.filter { $0.isConnected && !$0.isSuspended }
         captureDevice = availableCaptureDevices.first ?? AVCaptureDevice.default(for: .video)
         
-//        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-//        NotificationCenter.default.addObserver(
-//            self,
-//            selector: #selector(updateForDeviceOrientation),
-//            name: UIDevice.orientationDidChangeNotification,
-//            object: nil
-//        )
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateForDeviceOrientation),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
     }
     
     private func configureCaptureSession(completionHandler: (_ success: Bool) -> Void) {
@@ -182,7 +183,6 @@ class Camera: NSObject {
                 captureSession.addInput(deviceInput)
             }
         }
-        
     }
     
     func start() async {
@@ -207,6 +207,8 @@ class Camera: NSObject {
                 self.captureSession.startRunning()
             }
         }
+        
+        updateForDeviceOrientation()
     }
     
     func stop() {
@@ -218,36 +220,28 @@ class Camera: NSObject {
             }
         }
     }
-
-    private var deviceOrientation: UIDeviceOrientation {
-//        var orientation = UIDevice.current.orientation
-//        if orientation == UIDeviceOrientation.unknown {
-//            orientation = UIScreen.main.orientation
-//        }
-//        return orientation
-        // Only support portrait orientation
-        return UIDeviceOrientation.portrait
-    }
     
     @objc
     func updateForDeviceOrientation() {
-        // Nothing to do
-    }
-    
-    private func videoOrientationFor(_ deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation? {
-        switch deviceOrientation {
-        case .portrait: return AVCaptureVideoOrientation.portrait
-        case .portraitUpsideDown: return AVCaptureVideoOrientation.portraitUpsideDown
-        case .landscapeLeft: return AVCaptureVideoOrientation.landscapeRight
-        case .landscapeRight: return AVCaptureVideoOrientation.landscapeLeft
-        default: return nil
+        switch UIDevice.current.orientation {
+        case .portrait: cameraOrientation = .up
+        case .portraitUpsideDown: cameraOrientation = .down
+        case .landscapeLeft: cameraOrientation = .left
+        case .landscapeRight: cameraOrientation = .right
+        case .unknown, .faceUp, .faceDown: logger.info("Ignoring new devie orientation")
+        @unknown default: logger.error("Unknown device orientation detected")
         }
+        
+        // if we can not camera orientation based on device, use screen
+        cameraOrientation = cameraOrientation ?? UIScreen.main.orientation
     }
     
     func captureImage() {
         guard let photoOutput = self.photoOutput else { return }
         
         sessionQueue.async {
+            
+            let orientation = UIDevice.current.orientation
         
             var photoSettings = AVCapturePhotoSettings()
 
@@ -261,15 +255,7 @@ class Camera: NSObject {
 //            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
 //                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
 //            }
-            photoSettings.photoQualityPrioritization = .quality
-            
-            if let photoOutputVideoConnection = photoOutput.connection(with: .video) {
-                photoOutputVideoConnection
-                if photoOutputVideoConnection.isVideoOrientationSupported,
-                    let videoOrientation = self.videoOrientationFor(self.deviceOrientation) {
-                    photoOutputVideoConnection.videoOrientation = videoOrientation
-                }
-            }
+            photoSettings.photoQualityPrioritization = .speed
             
             photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
@@ -305,30 +291,25 @@ extension Camera: AVCaptureVideoDataOutputSampleBufferDelegate {
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
-        
-        if connection.isVideoOrientationSupported,
-           let videoOrientation = videoOrientationFor(deviceOrientation) {
-            connection.videoOrientation = videoOrientation
-        }
 
-        addToPreviewStream?(CIImage(cvPixelBuffer: pixelBuffer))
+        addToPreviewStream?(PreviewCapture(image: CIImage(cvPixelBuffer: pixelBuffer), cameraOrientation: cameraOrientation))
     }
 }
 
 fileprivate extension UIScreen {
 
-    var orientation: UIDeviceOrientation {
+    var orientation: CameraOrientation {
         let point = coordinateSpace.convert(CGPoint.zero, to: fixedCoordinateSpace)
         if point == CGPoint.zero {
-            return .portrait
+            return .up
         } else if point.x != 0 && point.y != 0 {
-            return .portraitUpsideDown
+            return .down
         } else if point.x == 0 && point.y != 0 {
-            return .landscapeRight //.landscapeLeft
+            return .left
         } else if point.x != 0 && point.y == 0 {
-            return .landscapeLeft //.landscapeRight
+            return .right
         } else {
-            return .unknown
+            return .up
         }
     }
 }
