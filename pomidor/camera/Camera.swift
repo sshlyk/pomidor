@@ -35,7 +35,7 @@ class Camera: NSObject {
         captureSession.isRunning
     }
 
-    private var addToPhotoStream: ((AVCapturePhoto) -> Void)?
+    private var addToPhotoStream: ((CameraCapture) -> Void)?
     
     private var addToPreviewStream: ((PreviewCapture) -> Void)?
     
@@ -49,7 +49,7 @@ class Camera: NSObject {
         }
     }
     
-    lazy var photoStream: AsyncStream<AVCapturePhoto> = {
+    lazy var photoStream: AsyncStream<CameraCapture> = {
         AsyncStream { continuation in
             addToPhotoStream = { photo in
                 continuation.yield(photo)
@@ -240,9 +240,6 @@ class Camera: NSObject {
         guard let photoOutput = self.photoOutput else { return }
         
         sessionQueue.async {
-            
-            let orientation = UIDevice.current.orientation
-        
             var photoSettings = AVCapturePhotoSettings()
 
             if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
@@ -251,7 +248,7 @@ class Camera: NSObject {
             
             let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
             photoSettings.flashMode = isFlashAvailable ? .auto : .off
-            photoSettings.isHighResolutionPhotoEnabled = true
+//            photoSettings.isHighResolutionPhotoEnabled = true
 //            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
 //                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
 //            }
@@ -283,7 +280,7 @@ extension Camera: AVCapturePhotoCaptureDelegate {
             return
         }
         
-        addToPhotoStream?(photo)
+        addToPhotoStream?(CameraCapture(photo: photo, cameraOrientation: cameraOrientation))
     }
 }
 

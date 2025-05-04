@@ -91,23 +91,21 @@ final class CameraDataModel: ObservableObject {
                 camera.resume()
             }
             
-            guard let metadataOrientation = capturedPhoto.metadata[String(kCGImagePropertyOrientation)] as? UInt32,
-                  let cgImageOrientation = CGImagePropertyOrientation(rawValue: metadataOrientation) else {
-                return
-            }
-            
-            guard var cgImage = capturedPhoto.cgImageRepresentation() else { continue }
+            guard let cgImage = capturedPhoto.photo.cgImageRepresentation() else { continue }
             
             // find bounding box for the movie title
-            if let request = findTitleBoundingBox {
-                try? VNImageRequestHandler(cgImage: cgImage, orientation: cgImageOrientation).perform([request])
-            }
-            
-            if let box = titleBox {
-                Task { @MainActor in
-                    textBoxes.boxes = [NormalizedTextBox(box)]
-                    movieName = "some movie title"
-                    print(titleBox.debugDescription)
+            if let request = findTitleBoundingBox, let cameraOrientation = capturedPhoto.cameraOrientation {
+                try? VNImageRequestHandler(
+                    cgImage: cgImage,
+                    orientation: CGImagePropertyOrientation(cameraOrientation)
+                ).perform([request])
+                
+                if let box = titleBox {
+                    Task { @MainActor in
+                        textBoxes.boxes = [NormalizedTextBox(box.reAdjust(originalCameraOrientation: cameraOrientation))]
+                        movieName = "some movie title"
+                        print(titleBox.debugDescription)
+                    }
                 }
             }
             
@@ -115,7 +113,6 @@ final class CameraDataModel: ObservableObject {
             Task { @MainActor in
                 movieName = ""
             }
-            
         }
     }
     
