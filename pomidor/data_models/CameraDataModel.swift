@@ -40,7 +40,7 @@ final class CameraDataModel: ObservableObject {
     func handleCameraPreviews() async {
         var detectionsBoxes: [CGRect]?
         let titleTrackingMLRequest: VNCoreMLRequest? = createTitleTrackingRequest { observations in
-            detectionsBoxes = observations.map {$0.boundingBox}
+            detectionsBoxes = observations
         }
 
         for await nextFrame in camera.previewStream {
@@ -51,14 +51,16 @@ final class CameraDataModel: ObservableObject {
             if previewTittleTrackingFramesSkipped > 2 {
                 // submit image for movie title tracking processing
                 if let request = titleTrackingMLRequest {
-                    if let cameraOrientation = nextFrame.cameraOrientation {
+                    if let cameraOrientation = nextFrame.orientation {
                         try? VNImageRequestHandler(
                             cgImage: previewCgImage,
                             orientation: CGImagePropertyOrientation(cameraOrientation)
                         ).perform([request])
                         
                         let adjustedToOrientationBoxes = detectionsBoxes?
-                            .map { $0.reAdjust(originalCameraOrientation: cameraOrientation) }
+                            .map {
+                                return $0.rotateToMatch(imageOrientation: cameraOrientation).rotateToMatch(imageOrientation: .left)
+                            }
                             .map { NormalizedTextBox($0) }
                         
                         Task { @MainActor in
@@ -73,6 +75,8 @@ final class CameraDataModel: ObservableObject {
             }
             
             Task { @MainActor in
+                // we pick one orientation to freeze the image so it does not jump when phone is rotated
+                // chosen orientation maximizes the screen as well
                 viewfinderImage = Image(decorative: previewCgImage, scale: 1, orientation: .right)
             }
         }
@@ -82,7 +86,7 @@ final class CameraDataModel: ObservableObject {
         var titleBox: CGRect?
         
         let findTitleBoundingBox = createTitleTrackingRequest { observations in
-            titleBox = observations.first?.boundingBox
+            titleBox = observations.first
         }
         
         for await capturedPhoto in camera.photoStream {
@@ -94,17 +98,25 @@ final class CameraDataModel: ObservableObject {
             guard let cgImage = capturedPhoto.photo.cgImageRepresentation() else { continue }
             
             // find bounding box for the movie title
-            if let request = findTitleBoundingBox, let cameraOrientation = capturedPhoto.cameraOrientation {
+            if let request = findTitleBoundingBox, let cameraOrientation = capturedPhoto.orientation {
                 try? VNImageRequestHandler(
                     cgImage: cgImage,
                     orientation: CGImagePropertyOrientation(cameraOrientation)
                 ).perform([request])
                 
                 if let box = titleBox {
+                    let boxAlignedWithImage = box.rotateToMatch(imageOrientation: cameraOrientation)
+                    
+                    let croppedImage = cgImage.cropping(to: NormalizedRect(normalizedRect: boxAlignedWithImage)
+                        .toImageCoordinates(CGSize(width: cgImage.width, height: cgImage.height), origin: .upperLeft))
+                    
+                    
                     Task { @MainActor in
-                        textBoxes.boxes = [NormalizedTextBox(box.reAdjust(originalCameraOrientation: cameraOrientation))]
+                        textBoxes.boxes = [NormalizedTextBox(boxAlignedWithImage.rotateToMatch(imageOrientation: .left))]
                         movieName = "some movie title"
-                        print(titleBox.debugDescription)
+                        
+                        // giving orientation .right instruct view to rotate image left when displayed to restore original up position
+                        viewfinderImage = Image(uiImage: UIImage(cgImage: croppedImage!, scale: 1, orientation: .right))
                     }
                 }
             }
@@ -116,13 +128,15 @@ final class CameraDataModel: ObservableObject {
         }
     }
     
-    private func createTitleTrackingRequest(handler: @escaping ([VNRecognizedObjectObservation]) -> Void) -> VNCoreMLRequest?  {
+    private func createTitleTrackingRequest(handler: @escaping ([CGRect]) -> Void) -> VNCoreMLRequest?  {
         var titleTrackingMLRequest: VNCoreMLRequest?
         
         if let model = titleTrackingModel {
             titleTrackingMLRequest = VNCoreMLRequest(model: model) { request, error in
                 if let observations = request.results as? [VNRecognizedObjectObservation] {
-                    handler(observations)
+                    // Bounding boxes returned by vision framework have origin at the bottom left (mac).
+                    // iOS uses top left origin instead
+                    handler(observations.map {$0.boundingBox })
                 }
             }
         }
@@ -177,32 +191,45 @@ fileprivate extension UIImage.Orientation {
 
 // Image transformation needed relative to camera physical position when photo was taken to correctly pass it to ML
 fileprivate extension CGImagePropertyOrientation {
-    init(_ cameraOrientation: CameraOrientation) {
+    init(_ cameraOrientation: CameraSensorOrientation) {
         switch cameraOrientation {
-        case .up: self = .right
-        case .down: self = .left
-        case .right: self = .down
-        case .left: self = .up
+        case .up: self = .up
+        case .down: self = .down
+        case .right: self = .right
+        case .left: self = .left
         }
     }
 }
 
 fileprivate extension CGRect {
-    func reAdjust(originalCameraOrientation: CameraOrientation) -> CGRect {
-        switch originalCameraOrientation {
-        case .up: return self
-            
-        case .down: return CGRect(
+    // rotates rectangular box to match image orientation
+    func rotateToMatch(imageOrientation: CameraSensorOrientation) -> CGRect {
+        switch imageOrientation {
+        case .up: return self // image is facing up. box is already positioned correctly
+        case .down: return self.rotatePlaneUpsideDown() // image is upside down. rotate box upside down
+        case .right: return self.rotatePlaneRight() // image is facing right. rotate box to face right
+        case .left: return self.rotatePlaneLeft() // image is facing left. rotate box to face left
+        }
+    }
+    
+    // move origin from top left corner to bottom left (rotating plane to the left)
+    private func rotatePlaneLeft() -> CGRect {
+        return CGRect(
+            origin: CGPoint(x: self.origin.y, y: 1 - self.origin.x - self.size.width),
+            size: CGSize(width: self.size.height, height: self.size.width))
+    }
+    
+    // move origin from top left to top right (rotating plane to the right)
+    private func rotatePlaneRight() -> CGRect {
+        return CGRect(
+            origin: CGPoint(x: 1 - self.origin.y - self.size.height, y: self.origin.x),
+            size: CGSize(width: self.size.height, height: self.size.width))
+    }
+    
+    // move origin from top left corner to bottom right (horizontal reflection of the plane)
+    private func rotatePlaneUpsideDown() ->CGRect {
+        return CGRect(
             origin: CGPoint(x: 1 - self.origin.x - self.width, y: 1 - self.origin.y - self.height),
             size: self.size)
-            
-        case .right: return CGRect(
-            origin: CGPoint(x: 1 - self.origin.y - self.height, y: self.origin.x),
-            size: CGSize(width: self.height, height: self.width))
-            
-        case .left: return CGRect(
-                origin: CGPoint(x: self.origin.y, y: 1 - self.origin.x - self.width),
-                size: CGSize(width: self.height, height: self.width))
-        }
     }
 }

@@ -10,7 +10,7 @@ class Camera: NSObject {
     private var photoOutput: AVCapturePhotoOutput?
     private var videoOutput: AVCaptureVideoDataOutput?
     private var sessionQueue: DispatchQueue!
-    private var cameraOrientation: CameraOrientation?
+    private var cameraSensorOrientation: CameraSensorOrientation?
     
     private var backCaptureDevices: [AVCaptureDevice] {
         AVCaptureDevice.DiscoverySession(
@@ -224,16 +224,16 @@ class Camera: NSObject {
     @objc
     func updateForDeviceOrientation() {
         switch UIDevice.current.orientation {
-        case .portrait: cameraOrientation = .up
-        case .portraitUpsideDown: cameraOrientation = .down
-        case .landscapeLeft: cameraOrientation = .left
-        case .landscapeRight: cameraOrientation = .right
-        case .unknown, .faceUp, .faceDown: logger.info("Ignoring new devie orientation")
+        case .portrait: cameraSensorOrientation = .right
+        case .portraitUpsideDown: cameraSensorOrientation = .left
+        case .landscapeLeft: cameraSensorOrientation = .up
+        case .landscapeRight: cameraSensorOrientation = .down
+        case .unknown, .faceUp, .faceDown: logger.info("Ignoring new device orientation")
         @unknown default: logger.error("Unknown device orientation detected")
         }
         
         // if we can not camera orientation based on device, use screen
-        cameraOrientation = cameraOrientation ?? UIScreen.main.orientation
+        cameraSensorOrientation = cameraSensorOrientation ?? UIScreen.main.orientation
     }
     
     func captureImage() {
@@ -280,7 +280,7 @@ extension Camera: AVCapturePhotoCaptureDelegate {
             return
         }
         
-        addToPhotoStream?(CameraCapture(photo: photo, cameraOrientation: cameraOrientation))
+        addToPhotoStream?(CameraCapture(photo: photo, orientation: cameraSensorOrientation))
     }
 }
 
@@ -289,22 +289,22 @@ extension Camera: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
 
-        addToPreviewStream?(PreviewCapture(image: CIImage(cvPixelBuffer: pixelBuffer), cameraOrientation: cameraOrientation))
+        addToPreviewStream?(PreviewCapture(image: CIImage(cvPixelBuffer: pixelBuffer), orientation: cameraSensorOrientation))
     }
 }
 
 fileprivate extension UIScreen {
 
-    var orientation: CameraOrientation {
+    var orientation: CameraSensorOrientation {
         let point = coordinateSpace.convert(CGPoint.zero, to: fixedCoordinateSpace)
         if point == CGPoint.zero {
-            return .up
-        } else if point.x != 0 && point.y != 0 {
-            return .down
-        } else if point.x == 0 && point.y != 0 {
-            return .left
-        } else if point.x != 0 && point.y == 0 {
             return .right
+        } else if point.x != 0 && point.y != 0 {
+            return .left
+        } else if point.x == 0 && point.y != 0 {
+            return .up
+        } else if point.x != 0 && point.y == 0 {
+            return .down
         } else {
             return .up
         }
