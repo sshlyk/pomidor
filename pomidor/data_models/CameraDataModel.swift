@@ -5,11 +5,13 @@ import Vision
 
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
-final class CameraDataModel: ObservableObject {
+final class CameraDataModel: ObservableObject, PreviewHandlerDelegate {
+    
     private let camera = Camera()
     private let textRecogntion = TextRecognition()
     private let titleTrackingModel: VNCoreMLModel?
     private var previewTittleTrackingFramesSkipped = 0
+    private var previewHandler: PreviewHandler?
     private let 🤷 = "🤷‍♂️"
     
     @Published var viewfinderImage: Image?
@@ -21,7 +23,8 @@ final class CameraDataModel: ObservableObject {
         titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
         textBoxes = TextBoxes()
         movieName = 🤷
-        Task { await handleCameraPreviews() }
+        previewHandler = PreviewHandler(titleTrackingModel: titleTrackingModel, stream: camera.previewStream)
+        Task { await previewHandler?.handleCameraPreviews(delegate: self) }
         Task { await handleCameraPhotos() }
     }
     
@@ -35,50 +38,20 @@ final class CameraDataModel: ObservableObject {
         camera.captureImage()
     }
     
-    // Video frames that are displayed in the viewfinder
-    // Detect region of the screen that contains movie title
-    func handleCameraPreviews() async {
-        var detectionsBoxes: [CGRect]?
-        let titleTrackingMLRequest: VNCoreMLRequest? = createTitleTrackingRequest { observations in
-            detectionsBoxes = observations
+    func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?) {
+        guard let previewCgImage = capture.image.cgImage else { return }
+        
+        let transformedDetections = capture.orientation.flatMap { orientation in
+            detections?.map { $0.rotateToMatch(imageOrientation: orientation) }
         }
-
-        for await nextFrame in camera.previewStream {
-            guard let previewCgImage = nextFrame.image.cgImage else {
-                return
-            }
-            
-            if previewTittleTrackingFramesSkipped > 2 {
-                // submit image for movie title tracking processing
-                if let request = titleTrackingMLRequest {
-                    if let cameraOrientation = nextFrame.orientation {
-                        try? VNImageRequestHandler(
-                            cgImage: previewCgImage,
-                            orientation: CGImagePropertyOrientation(cameraOrientation)
-                        ).perform([request])
-                        
-                        let adjustedToOrientationBoxes = detectionsBoxes?
-                            .map {
-                                return $0.rotateToMatch(imageOrientation: cameraOrientation).rotateToMatch(imageOrientation: .left)
-                            }
-                            .map { NormalizedTextBox($0) }
-                        
-                        Task { @MainActor in
-                            self.textBoxes.boxes = adjustedToOrientationBoxes ?? []
-                        }
-                    }
-                    
-                    previewTittleTrackingFramesSkipped = 0
-                }
-            } else {
-                previewTittleTrackingFramesSkipped += 1
-            }
-            
-            Task { @MainActor in
-                // we pick one orientation to freeze the image so it does not jump when phone is rotated
-                // chosen orientation maximizes the screen as well
-                viewfinderImage = Image(decorative: previewCgImage, scale: 1, orientation: .right)
-            }
+        
+        Task { @MainActor in
+            // Display image. The image is currently rotated left when rendered
+            // Text boxes needs to be rotated to the left
+            viewfinderImage =  Image(decorative: previewCgImage, scale: 1, orientation: .right)
+            textBoxes.boxes = transformedDetections?.map {
+                NormalizedTextBox($0.rotateToMatch(imageOrientation: .left))
+            } ?? []
         }
     }
     
