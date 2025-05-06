@@ -59,8 +59,9 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
         Task { @MainActor in
             textBoxes.boxes = []
             if let title = capturedMovieTitle {
-                // uncoment to see actual captured image of the movie title
-                // viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+                if AppConfig.Debug.kShowCapturedMovieTitleCrop {
+                    viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+                }
                 movieName = text.joined(separator: " ")
             } else {
                 movieName = AppConfig.UI.kNotFoundText
