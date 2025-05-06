@@ -13,10 +13,17 @@ extension CGRect {
         }
     }
     
+    // convert normalized rectangle to actual image coordinates
     func toImageCoordinates(cgImage: CGImage) -> CGRect {
         let size = CGSize(width: cgImage.width, height: cgImage.height);
         return NormalizedRect(normalizedRect: self).toImageCoordinates(size, origin: .upperLeft)
     }
+    
+    func scale(by factor: Double) -> CGRect {
+        return self.insetBy(dx: -self.size.width * factor, dy: -self.size.height * factor)
+    }
+    
+    // ---------------------------------------------
     
     // move origin from top left corner to bottom left (rotating plane to the left)
     private func rotatePlaneLeft() -> CGRect {

@@ -242,18 +242,16 @@ class Camera: NSObject {
         sessionQueue.async {
             var photoSettings = AVCapturePhotoSettings()
 
-            if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+            if photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
                 photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
             }
             
-            let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
-            photoSettings.flashMode = isFlashAvailable ? .auto : .off
-//            photoSettings.isHighResolutionPhotoEnabled = true
+            photoSettings.flashMode = AppConfig.Camera.kDisableFlashMode ? .off : .auto
+            photoSettings.isHighResolutionPhotoEnabled = AppConfig.Camera.kEnableHighResolution
 //            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
 //                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
 //            }
-            photoSettings.photoQualityPrioritization = .speed
-            
+            photoSettings.photoQualityPrioritization = AppConfig.Camera.kPhotoQuality
             photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
     }

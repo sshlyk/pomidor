@@ -19,8 +19,8 @@ struct ViewfinderView: View {
             .overlay{
                 Text(movieTitle)
                     .font(.largeTitle)
-                    .background(.white.opacity(0.5))
-                    .cornerRadius(.greatestFiniteMagnitude  )
+                    .background(.white.opacity(0.8))
+                    .cornerRadius(10)
             }
             .scaledToFit()
             //.scaledToFill()

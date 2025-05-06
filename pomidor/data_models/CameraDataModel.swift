@@ -5,11 +5,11 @@ import Vision
 
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
-final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, PhotoHandlerDelegate {
+final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotHandlerDelegate {
 
     private let camera = Camera()
     private var previewHandler: PreviewHandler?
-    private var photoHandler: PhotoHandler?
+    private var photoHandler: SnapshotsHandler?
     
     @Published var viewfinderImage: Image?
     @Published var textBoxes: TextBoxes
@@ -20,7 +20,7 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, PhotoHand
         textBoxes = TextBoxes()
         movieName = ""
         previewHandler = PreviewHandler(titleTrackingModel: titleTrackingModel, stream: camera.previewStream)
-        photoHandler = PhotoHandler(titleTrackingModel: titleTrackingModel, stream: camera.photoStream)
+        photoHandler = SnapshotsHandler(titleTrackingModel: titleTrackingModel, stream: camera.photoStream)
         Task { await previewHandler?.handleCameraPreviews(delegate: self) }
         Task { await photoHandler?.handleCameraPhotos(delegate: self) }
     }
@@ -39,7 +39,7 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, PhotoHand
         
         let transformedDetections = capture.orientation.flatMap { orientation in
             detections?.map { $0.rotateToMatch(imageOrientation: orientation) }
-        }
+        }?.map { $0.scale(by: 0.1) }
         
         Task { @MainActor in
             // Display image. The image is currently rotated left when rendered
@@ -59,16 +59,15 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, PhotoHand
         Task { @MainActor in
             textBoxes.boxes = []
             if let title = capturedMovieTitle {
-                viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
-                // movieName = text.joined(separator: " ")
-                movieName = "👍"
+                // uncoment to see actual captured image of the movie title
+                // viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+                movieName = text.joined(separator: " ")
             } else {
-                movieName = "💩"
+                movieName = AppConfig.UI.kNotFoundText
             }
         }
         
-        
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
         
         Task { @MainActor in
             movieName = ""

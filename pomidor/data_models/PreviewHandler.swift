@@ -1,11 +1,14 @@
 import Vision
 import SwiftUI
 import Foundation
+import os.log
 
 protocol PreviewHandlerDelegate {
     // broadcasts preview frame and detections oriented as if image is rotated up based on preview orientation info
     func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?) async
 }
+
+fileprivate let logger = Logger(subsystem: "pomidor", category: "PreviewHandler")
 
 class PreviewHandler {
     
@@ -45,7 +48,10 @@ class PreviewHandler {
                 previewTittleTrackingFramesSkipped += 1
             }
             
-            await delegate.nextPreviewFrame(capture: nextFrame, detections: detections)
+            await delegate.nextPreviewFrame(
+                capture: nextFrame,
+                detections: detections?.map { $0.scale(by: AppConfig.OCR.kDetectedAreaScale) }
+            )
         }
     }
 }
