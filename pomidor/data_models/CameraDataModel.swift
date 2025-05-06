@@ -5,27 +5,24 @@ import Vision
 
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
-final class CameraDataModel: ObservableObject, PreviewHandlerDelegate {
-    
+final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, PhotoHandlerDelegate {
+
     private let camera = Camera()
-    private let textRecogntion = TextRecognition()
-    private let titleTrackingModel: VNCoreMLModel?
-    private var previewTittleTrackingFramesSkipped = 0
     private var previewHandler: PreviewHandler?
-    private let 🤷 = "🤷‍♂️"
+    private var photoHandler: PhotoHandler?
     
     @Published var viewfinderImage: Image?
-    @Published var thumbnailImage: Image?
     @Published var textBoxes: TextBoxes
     @Published var movieName: String
     
     init() {
-        titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
+        let titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
         textBoxes = TextBoxes()
-        movieName = 🤷
+        movieName = ""
         previewHandler = PreviewHandler(titleTrackingModel: titleTrackingModel, stream: camera.previewStream)
+        photoHandler = PhotoHandler(titleTrackingModel: titleTrackingModel, stream: camera.photoStream)
         Task { await previewHandler?.handleCameraPreviews(delegate: self) }
-        Task { await handleCameraPhotos() }
+        Task { await photoHandler?.handleCameraPhotos(delegate: self) }
     }
     
     func start() async {
@@ -33,12 +30,11 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate {
     }
     
     func captureImage() {
-        textBoxes.boxes = [] // clear on-screen tracking
         camera.pause() // pause viewfinder video so still picture does not feel jumping when ready
         camera.captureImage()
     }
     
-    func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?) {
+    func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?) async {
         guard let previewCgImage = capture.image.cgImage else { return }
         
         let transformedDetections = capture.orientation.flatMap { orientation in
@@ -55,69 +51,27 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate {
         }
     }
     
-    func handleCameraPhotos() async {
-        var titleBox: CGRect?
-        
-        let findTitleBoundingBox = createTitleTrackingRequest { observations in
-            titleBox = observations.first
+    func nextPhotoFrame(capturedMovieTitle: CGImage?, text: [String]) async {
+        defer {
+            camera.resume()
         }
         
-        for await capturedPhoto in camera.photoStream {
-            // when done processing photo, resume viewfinder and
-            defer {
-                camera.resume()
-            }
-            
-            guard let cgImage = capturedPhoto.photo.cgImageRepresentation() else { continue }
-            
-            // find bounding box for the movie title
-            if let request = findTitleBoundingBox, let cameraOrientation = capturedPhoto.orientation {
-                try? VNImageRequestHandler(
-                    cgImage: cgImage,
-                    orientation: CGImagePropertyOrientation(cameraOrientation)
-                ).perform([request])
-                
-                if let box = titleBox {
-                    let boxAlignedWithImage = box.rotateToMatch(imageOrientation: cameraOrientation)
-                    
-                    let croppedImage = cgImage.cropping(to: NormalizedRect(normalizedRect: boxAlignedWithImage)
-                        .toImageCoordinates(CGSize(width: cgImage.width, height: cgImage.height), origin: .upperLeft))
-                    
-                    
-                    Task { @MainActor in
-                        textBoxes.boxes = [NormalizedTextBox(boxAlignedWithImage.rotateToMatch(imageOrientation: .left))]
-                        movieName = "some movie title"
-                        
-                        // giving orientation .right instruct view to rotate image left when displayed to restore original up position
-                        viewfinderImage = Image(uiImage: UIImage(cgImage: croppedImage!, scale: 1, orientation: .right))
-                    }
-                }
-            }
-            
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            Task { @MainActor in
-                movieName = ""
-            }
-        }
-    }
-    
-    private func createTitleTrackingRequest(handler: @escaping ([CGRect]) -> Void) -> VNCoreMLRequest?  {
-        var titleTrackingMLRequest: VNCoreMLRequest?
-        
-        if let model = titleTrackingModel {
-            titleTrackingMLRequest = VNCoreMLRequest(model: model) { request, error in
-                if let observations = request.results as? [VNRecognizedObjectObservation] {
-                    // Bounding boxes returned by vision framework have origin at the bottom left (mac).
-                    // iOS uses top left origin instead
-                    handler(observations.map {$0.boundingBox })
-                }
+        Task { @MainActor in
+            textBoxes.boxes = []
+            if let title = capturedMovieTitle {
+                viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+                // movieName = text.joined(separator: " ")
+                movieName = "👍"
+            } else {
+                movieName = "💩"
             }
         }
         
-        // image can be rotated or region of interest selected
-        //titleTrackingMLRequest?.imageCropAndScaleOption = .scaleFillRotate90CCW
-        //titleTrackingMLRequest?.regionOfInterest = ...
         
-        return titleTrackingMLRequest
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        
+        Task { @MainActor in
+            movieName = ""
+        }
     }
 }

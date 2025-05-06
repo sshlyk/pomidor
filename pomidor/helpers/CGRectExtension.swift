@@ -1,4 +1,6 @@
 import CoreFoundation
+import CoreGraphics
+import Vision
 
 extension CGRect {
     // rotates rectangular box to match image orientation
@@ -9,6 +11,11 @@ extension CGRect {
         case .right: return self.rotatePlaneRight() // image is facing right. rotate box to face right
         case .left: return self.rotatePlaneLeft() // image is facing left. rotate box to face left
         }
+    }
+    
+    func toImageCoordinates(cgImage: CGImage) -> CGRect {
+        let size = CGSize(width: cgImage.width, height: cgImage.height);
+        return NormalizedRect(normalizedRect: self).toImageCoordinates(size, origin: .upperLeft)
     }
     
     // move origin from top left corner to bottom left (rotating plane to the left)

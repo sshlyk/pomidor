@@ -4,7 +4,7 @@ import Foundation
 
 protocol PreviewHandlerDelegate {
     // broadcasts preview frame and detections oriented as if image is rotated up based on preview orientation info
-    func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?)
+    func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?) async
 }
 
 class PreviewHandler {
@@ -45,7 +45,7 @@ class PreviewHandler {
                 previewTittleTrackingFramesSkipped += 1
             }
             
-            delegate.nextPreviewFrame(capture: nextFrame, detections: detections)
+            await delegate.nextPreviewFrame(capture: nextFrame, detections: detections)
         }
     }
 }
