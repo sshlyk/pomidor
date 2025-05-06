@@ -27,45 +27,42 @@ class SnapshotsHandler {
         }
 
         for await capturedPhoto in stream {
-
-            var croppedCGImage: CGImage?
             
-            if let cgImage = capturedPhoto.photo.cgImageRepresentation() {
-                // find bounding box for the movie title
-                if let request = titleTrackingMLRequest, let cameraOrientation = capturedPhoto.orientation {
-                    try? VNImageRequestHandler(
-                        cgImage: cgImage,
-                        orientation: CGImagePropertyOrientation(cameraOrientation)
-                    ).perform([request])
-                    
-                    if let box = detection {
-                        let rectToCrop = box
-                            // always scale first, ince rectangle is facing up when returned by ML
-                            .scale(
-                                widthFactor: AppConfig.OCR.kDetectedAreaWidthScale,
-                                heightFactor: AppConfig.OCR.kDetectedAreaHeightScale
-                            )
-                            .rotateToMatch(imageOrientation: cameraOrientation)
-                            .toImageCoordinates(cgImage: cgImage)
-                            
-                        croppedCGImage = cgImage.cropping(to: rectToCrop)
-                    }
+            let photo = capturedPhoto.photo.cgImageRepresentation()
+            var wordRecognitions: [[VNRecognizedText]]?
+            
+            // extract image crop area and perfrom text recognition
+            if let p = photo, let orientation = capturedPhoto.orientation, let request = titleTrackingMLRequest {
+                try? VNImageRequestHandler(
+                    cgImage: p,
+                    orientation: CGImagePropertyOrientation(orientation)
+                ).perform([request])
+                
+                detection = detection?.scale(
+                    widthFactor: AppConfig.OCR.kDetectedAreaWidthScale,
+                    heightFactor: AppConfig.OCR.kDetectedAreaHeightScale
+                )
+                
+                wordRecognitions = detection.map { crop in
+                    recognizeText(cgImage: p, orientation: orientation, regionOfInterest: crop)
                 }
             }
-            
-            var words: [String] = []
-            if let title = croppedCGImage, let orientation = capturedPhoto.orientation {
-                let result = recognizeText(cgImage: title, orientation: orientation)
-                words = result.map{ $0.first?.string.lowercased() ?? "" }
+
+            var imageCrop: CGImage? // cropped area extracted for debugging purposes
+            if AppConfig.Debug.kShowCapturedMovieTitleCrop,
+                let p = photo, let crop = detection, let orientation = capturedPhoto.orientation {
+                imageCrop = p.cropping(to: crop
+                    .rotateToMatch(imageOrientation: orientation)
+                    .toImageCoordinates(cgImage: p)
+                )
             }
             
-            await delegate.nextPhotoFrame(capturedMovieTitle: croppedCGImage, text: words)
+            let words = wordRecognitions?.map{ $0.first?.string.lowercased() ?? ""}
+            await delegate.nextPhotoFrame(capturedMovieTitle: imageCrop, text: words ?? [])
         }
     }
     
-    private func recognizeText(cgImage: CGImage, orientation: CameraSensorOrientation) -> [[VNRecognizedText]] {
-        let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation.toCGImageOrientation())
-        
+    private func recognizeText(cgImage: CGImage, orientation: CameraSensorOrientation, regionOfInterest: CGRect) -> [[VNRecognizedText]] {
         var out: [[VNRecognizedText]] = []
         
         let request = VNRecognizeTextRequest() { (request: VNRequest, error: Error?) in
@@ -83,7 +80,9 @@ class SnapshotsHandler {
         request.recognitionLevel = AppConfig.OCR.kRecognitionLevel
         request.usesLanguageCorrection = AppConfig.OCR.kUseLanguageCorrection
         request.minimumTextHeight = AppConfig.OCR.kMinTextHight
+        request.regionOfInterest = regionOfInterest
         
+        let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation.toCGImageOrientation())
         try? requestHandler.perform([request])
         
         return out

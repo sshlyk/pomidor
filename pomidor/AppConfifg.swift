@@ -9,7 +9,7 @@ struct AppConfig {
         static let kRecognizedLanguages: [Language] = [.english]
         static let kRecognitionLevel: VNRequestTextRecognitionLevel = .accurate
         static let kUseLanguageCorrection = true
-        static let kMinTextHight: Float = 0.5 // relative to image
+        static let kMinTextHight: Float = 0.1 // relative to image (NOTE: only active if accuracy is set to "fast")
         static let kDetectedAreaWidthScale: Double = 0.15 // increase detected rectangular width before cropping
         static let kDetectedAreaHeightScale: Double = 0.05 // increase detected rectangular height before cropping
         static let kAutomaticallyDetectLanguages = false
