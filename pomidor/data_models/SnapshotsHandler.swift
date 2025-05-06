@@ -40,9 +40,14 @@ class SnapshotsHandler {
                     
                     if let box = detection {
                         let rectToCrop = box
+                            // always scale first, ince rectangle is facing up when returned by ML
+                            .scale(
+                                widthFactor: AppConfig.OCR.kDetectedAreaWidthScale,
+                                heightFactor: AppConfig.OCR.kDetectedAreaHeightScale
+                            )
                             .rotateToMatch(imageOrientation: cameraOrientation)
-                            .scale(by: AppConfig.OCR.kDetectedAreaScale) // increase captured aread
                             .toImageCoordinates(cgImage: cgImage)
+                            
                         croppedCGImage = cgImage.cropping(to: rectToCrop)
                     }
                 }

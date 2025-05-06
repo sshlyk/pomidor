@@ -50,7 +50,10 @@ class PreviewHandler {
             
             await delegate.nextPreviewFrame(
                 capture: nextFrame,
-                detections: detections?.map { $0.scale(by: AppConfig.OCR.kDetectedAreaScale) }
+                detections: detections?.map { $0.scale(
+                    widthFactor: AppConfig.OCR.kDetectedAreaWidthScale,
+                    heightFactor: AppConfig.OCR.kDetectedAreaHeightScale
+                ) }
             )
         }
     }

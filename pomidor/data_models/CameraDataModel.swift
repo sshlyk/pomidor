@@ -39,7 +39,7 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
         
         let transformedDetections = capture.orientation.flatMap { orientation in
             detections?.map { $0.rotateToMatch(imageOrientation: orientation) }
-        }?.map { $0.scale(by: 0.1) }
+        }
         
         Task { @MainActor in
             // Display image. The image is currently rotated left when rendered

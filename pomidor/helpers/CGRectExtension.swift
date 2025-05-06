@@ -19,8 +19,8 @@ extension CGRect {
         return NormalizedRect(normalizedRect: self).toImageCoordinates(size, origin: .upperLeft)
     }
     
-    func scale(by factor: Double) -> CGRect {
-        return self.insetBy(dx: -self.size.width * factor, dy: -self.size.height * factor)
+    func scale(widthFactor wFactor: Double, heightFactor hFactor: Double) -> CGRect {
+        return self.insetBy(dx: -self.size.width * wFactor, dy: -self.size.height * hFactor)
     }
     
     // ---------------------------------------------
