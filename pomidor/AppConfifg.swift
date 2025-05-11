@@ -24,11 +24,11 @@ struct AppConfig {
     struct UI {
         static let kNotFoundText = "🤷"
         static let kSnapDelaySec:UInt64 = 2 // delay after snapshot take to display the result
-
+        static let kMovieSearchBaseURL = "https://www.google.com/search?q=imdb+"
     }
     
     struct Debug {
-        static let kShowCapturedMovieTitleCrop = true // show captured cropped movie title image
+        static let kShowCapturedMovieTitleCrop = false // show captured cropped movie title image
     }
 
 }

@@ -15,6 +15,9 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
     @Published var textBoxes: TextBoxes
     @Published var movieName: String
     
+    @Published var showWebView: Bool = false
+    var webViewSearchQuery: String = ""
+    
     init() {
         let titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
         textBoxes = TextBoxes()
@@ -30,6 +33,10 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
     }
     
     func captureImage() {
+        if camera.isPreviewPaused {
+            return // we are already taking a picture. once it is processed preview will resume
+        }
+        
         camera.pause() // pause viewfinder video so still picture does not feel jumping when ready
         camera.captureImage()
     }
@@ -56,22 +63,29 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
             camera.resume()
         }
         
-        Task { @MainActor in
-            textBoxes.boxes = []
-            if let title = capturedMovieTitle {
-                if AppConfig.Debug.kShowCapturedMovieTitleCrop {
-                    viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+        if AppConfig.Debug.kShowCapturedMovieTitleCrop {
+            Task { @MainActor in
+                textBoxes.boxes = []
+                if let title = capturedMovieTitle {
+                    if AppConfig.Debug.kShowCapturedMovieTitleCrop {
+                        viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+                    }
+                    movieName = text.joined(separator: " ")
+                } else {
+                    movieName = AppConfig.UI.kNotFoundText
                 }
-                movieName = text.joined(separator: " ")
-            } else {
-                movieName = AppConfig.UI.kNotFoundText
             }
-        }
-        
-        try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
-        
-        Task { @MainActor in
-            movieName = ""
+            
+            try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
+            
+            Task { @MainActor in
+                movieName = ""
+            }
+        } else {
+            Task { @MainActor in
+                webViewSearchQuery = text.joined(separator: " ")
+                showWebView = true
+            }
         }
     }
 }

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct MainView: View {
     @StateObject private var model = CameraDataModel()
+    private let webView = WebView()
  
     private static let barHeightFactor = 0.15
-        
+    
+    
     var body: some View {
         
         NavigationStack {
@@ -15,13 +17,6 @@ struct MainView: View {
                             .frame(height: geometry.size.height * Self.barHeightFactor)
                             .background(.black.opacity(0.75))
                     }
-//                    .overlay(alignment: .center)  {
-//                        Color.clear
-//                            .frame(height: geometry.size.height * (1 - (Self.barHeightFactor * 2)))
-//                            .accessibilityElement()
-//                            .accessibilityLabel("View Finder")
-//                            .accessibilityAddTraits([.isImage])
-//                    }
                     .background(.black)
             }
             .task {
@@ -55,6 +50,9 @@ struct MainView: View {
                             .frame(width: 50, height: 50)
                     }
                 }
+            }
+            .navigationDestination(isPresented: $model.showWebView) {
+                WebViewContainer(url: model.webViewSearchQuery, webView: webView)
             }
             
             Spacer()
