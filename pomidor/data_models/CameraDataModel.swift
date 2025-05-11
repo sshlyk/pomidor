@@ -8,8 +8,10 @@ fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotHandlerDelegate {
 
     private let camera = Camera()
-    private var previewHandler: PreviewHandler?
-    private var photoHandler: SnapshotsHandler?
+    private let previewHandler: PreviewHandler
+    private let photoHandler: SnapshotsHandler
+    private let dispatchQueue = DispatchQueue(label: "Camera model queue")
+    private var isRunning = false
     
     @Published var viewfinderImage: Image?
     @Published var textBoxes: TextBoxes
@@ -24,14 +26,20 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
         movieName = ""
         previewHandler = PreviewHandler(titleTrackingModel: titleTrackingModel, stream: camera.previewStream)
         photoHandler = SnapshotsHandler(titleTrackingModel: titleTrackingModel, stream: camera.photoStream)
-        
-        // TODO do clean destruction
-        Task { await previewHandler?.handleCameraPreviews(delegate: self) }
-        Task { await photoHandler?.handleCameraPhotos(delegate: self) }
+    }
+    
+    deinit {
+        camera.stop()
     }
     
     func start() async {
-        await camera.start()
+        dispatchQueue.async {
+            if self.isRunning { return } // make sure we subscribe to camera stream only once
+            Task { await self.camera.start() }
+            Task { await self.previewHandler.handleCameraPreviews(delegate: self) }
+            Task { await self.photoHandler.handleCameraPhotos(delegate: self) }
+            self.isRunning = true
+        }
     }
     
     func zoom(zoomFactor: CGFloat) {
