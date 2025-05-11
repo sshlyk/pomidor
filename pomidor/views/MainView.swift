@@ -3,9 +3,9 @@ import SwiftUI
 struct MainView: View {
     @StateObject private var model = CameraDataModel()
     private let webView = WebView()
- 
-    private static let barHeightFactor = 0.15
+    @State private var currentZoom: CGFloat = 1
     
+    private static let barHeightFactor = 0.15
     
     var body: some View {
         
@@ -18,7 +18,11 @@ struct MainView: View {
                             .background(.black.opacity(0.75))
                     }
                     .background(.black)
-            }
+            }.gesture(
+                MagnifyGesture()
+                    .onChanged { model.zoom(zoomFactor: clampZoomFactor($0.magnification)) }
+                    .onEnded { currentZoom = clampZoomFactor($0.magnification) }
+            )
             .task {
                 await model.start()
             }
@@ -61,5 +65,9 @@ struct MainView: View {
         .buttonStyle(.plain)
         .labelStyle(.iconOnly)
         .padding()
+    }
+    
+    private func clampZoomFactor(_ zoomFactor: CGFloat) -> CGFloat {
+        return max(1, min(AppConfig.UI.kMaxZoomFactor, currentZoom * zoomFactor))
     }
 }

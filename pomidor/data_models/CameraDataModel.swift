@@ -24,12 +24,18 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
         movieName = ""
         previewHandler = PreviewHandler(titleTrackingModel: titleTrackingModel, stream: camera.previewStream)
         photoHandler = SnapshotsHandler(titleTrackingModel: titleTrackingModel, stream: camera.photoStream)
+        
+        // TODO do clean destruction
         Task { await previewHandler?.handleCameraPreviews(delegate: self) }
         Task { await photoHandler?.handleCameraPhotos(delegate: self) }
     }
     
     func start() async {
         await camera.start()
+    }
+    
+    func zoom(zoomFactor: CGFloat) {
+        camera.zoom(zoomFactor: zoomFactor)
     }
     
     func captureImage() {

@@ -25,6 +25,7 @@ struct AppConfig {
         static let kNotFoundText = "🤷"
         static let kSnapDelaySec:UInt64 = 2 // delay after snapshot take to display the result
         static let kMovieSearchBaseURL = "https://www.google.com/search?q=imdb+"
+        static let kMaxZoomFactor: CGFloat = 10 // pinch to zoom. Capturing device will enforce own maximum
     }
     
     struct Debug {

@@ -237,9 +237,10 @@ class Camera: NSObject {
     }
     
     func captureImage() {
-        guard let photoOutput = self.photoOutput else { return }
         
         sessionQueue.async {
+            guard let photoOutput = self.photoOutput else { return }
+            
             var photoSettings = AVCapturePhotoSettings()
 
             if photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
@@ -266,6 +267,23 @@ class Camera: NSObject {
         sessionQueue.async {
             self.isPreviewPaused = false
         }
+    }
+    
+    func zoom(zoomFactor: CGFloat) {
+        sessionQueue.async {
+            do {
+                guard let device = self.captureDevice else {
+                    return
+                }
+                
+                try device.lockForConfiguration()
+                device.videoZoomFactor = max(1, min(zoomFactor, device.activeFormat.videoMaxZoomFactor))
+                device.unlockForConfiguration()
+            } catch {
+                logger.error("Failed to set video zoom factor \(zoomFactor)")
+            }
+        }
+
     }
 }
 
