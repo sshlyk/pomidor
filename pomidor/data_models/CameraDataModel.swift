@@ -8,25 +8,15 @@ fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotHandlerDelegate {
 
     private let camera = Camera()
-    private let previewHandler: PreviewHandler
-    private let photoHandler: SnapshotsHandler
     private let dispatchQueue = DispatchQueue(label: "Camera model queue")
     private var isRunning = false
     
     @Published var viewfinderImage: Image?
-    @Published var textBoxes: TextBoxes
-    @Published var movieName: String
+    @Published var textBoxes: TextBoxes = TextBoxes()
+    @Published var movieName: String = ""
     
     @Published var showWebView: Bool = false
     var webViewSearchQuery: String = ""
-    
-    init() {
-        let titleTrackingModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
-        textBoxes = TextBoxes()
-        movieName = ""
-        previewHandler = PreviewHandler(titleTrackingModel: titleTrackingModel, stream: camera.previewStream)
-        photoHandler = SnapshotsHandler(titleTrackingModel: titleTrackingModel, stream: camera.photoStream)
-    }
     
     deinit {
         camera.stop()
@@ -35,17 +25,33 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
     func start() async {
         dispatchQueue.async {
             if self.isRunning { return } // make sure we subscribe to camera stream only once
+            
             Task { await self.camera.start() }
-            Task { await self.previewHandler.handleCameraPreviews(delegate: self) }
-            Task { await self.photoHandler.handleCameraPhotos(delegate: self) }
+            
+            // Handler completes when stream it subscribes to finishes (explicitly finished or destroyed)
+            let model = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
+            
+            Task {
+                let handler = PreviewHandler(titleTrackingModel: model, stream: self.camera.previewStream)
+                await handler.handleCameraPreviews(delegate: self)
+            }
+            
+            Task {
+                let handler = SnapshotsHandler(titleTrackingModel: model, stream: self.camera.photoStream)
+                await handler.handleCameraPhotos(delegate: self)
+            }
+            
             self.isRunning = true
         }
     }
     
+    // Change zoom factor
+    // Thread safe
     func zoom(zoomFactor: CGFloat) {
         camera.zoom(zoomFactor: zoomFactor)
     }
     
+    // Thread safe
     func captureImage() {
         if camera.isPreviewPaused {
             return // we are already taking a picture. once it is processed preview will resume
@@ -78,28 +84,33 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
         }
         
         if AppConfig.Debug.kShowCapturedMovieTitleCrop {
-            Task { @MainActor in
-                textBoxes.boxes = []
-                if let title = capturedMovieTitle {
-                    if AppConfig.Debug.kShowCapturedMovieTitleCrop {
-                        viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
-                    }
-                    movieName = text.joined(separator: " ")
-                } else {
-                    movieName = AppConfig.UI.kNotFoundText
-                }
-            }
-            
-            try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
-            
-            Task { @MainActor in
-                movieName = ""
-            }
+            await debugShowCapturedTitle(capturedMovieTitle, text)
         } else {
             Task { @MainActor in
                 webViewSearchQuery = text.joined(separator: " ")
                 showWebView = true
             }
+        }
+    }
+    
+    // Used for debugging purposes. Show cropped image of the captured movie title
+    private func debugShowCapturedTitle(_ capturedMovieTitle: CGImage?, _ text: [String]) async {
+        Task { @MainActor in
+            textBoxes.boxes = []
+            if let title = capturedMovieTitle {
+                if AppConfig.Debug.kShowCapturedMovieTitleCrop {
+                    viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
+                }
+                movieName = text.joined(separator: " ")
+            } else {
+                movieName = AppConfig.UI.kNotFoundText
+            }
+        }
+        
+        try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
+        
+        Task { @MainActor in
+            movieName = ""
         }
     }
 }
