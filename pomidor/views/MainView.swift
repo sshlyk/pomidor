@@ -24,13 +24,16 @@ struct MainView: View {
                     .onEnded { currentZoom = clampZoomFactor($0.magnification) }
             )
             .task {
-                await model.start()
+                await model.startCamera()
             }
             .navigationTitle("Camera")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(true)
             .ignoresSafeArea()
             .statusBar(hidden: true)
+            .onDisappear {
+                model.stopCamera()
+            }
         }
     }
     

@@ -14,7 +14,6 @@ class PreviewHandler {
     
     private let titleTrackingModel: VNCoreMLModel?
     private let stream: AsyncStream<PreviewCapture>
-    private var previewTittleTrackingFramesSkipped = 0
 
     init(titleTrackingModel: VNCoreMLModel?, stream: AsyncStream<PreviewCapture>) {
         self.titleTrackingModel = titleTrackingModel
@@ -24,6 +23,7 @@ class PreviewHandler {
     // Video frames that are displayed in the viewfinder
     // Detect region of the screen that contains movie title
     func handleCameraPreviews(delegate: PreviewHandlerDelegate) async {
+        var previewTittleTrackingFramesSkipped = 0
         var detections: [CGRect]?
         let titleTrackingMLRequest = titleTrackingModel.map { model in
             MLHelpers.createObjectTrackingRequest(model: model) { detections = $0 }

@@ -13,7 +13,6 @@ class SnapshotsHandler {
 
     private let titleTrackingModel: VNCoreMLModel?
     private let stream: AsyncStream<CameraCapture>
-    private var previewTittleTrackingFramesSkipped = 0
 
     init(titleTrackingModel: VNCoreMLModel?, stream: AsyncStream<CameraCapture>) {
         self.titleTrackingModel = titleTrackingModel

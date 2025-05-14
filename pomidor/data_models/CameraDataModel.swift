@@ -6,10 +6,8 @@ import Vision
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
 final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotHandlerDelegate {
-
     private let camera = Camera()
     private let dispatchQueue = DispatchQueue(label: "Camera model queue")
-    private var isRunning = false
     
     @Published var viewfinderImage: Image?
     @Published var textBoxes: TextBoxes = TextBoxes()
@@ -18,46 +16,34 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
     @Published var showWebView: Bool = false
     var webViewSearchQuery: String = ""
     
-    deinit {
-        camera.stop()
-    }
-    
-    func start() async {
-        dispatchQueue.async {
-            if self.isRunning { return } // make sure we subscribe to camera stream only once
-            
-            Task { await self.camera.start() }
-            
-            // Handler completes when stream it subscribes to finishes (explicitly finished or destroyed)
-            let model = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
-            
-            Task {
-                let handler = PreviewHandler(titleTrackingModel: model, stream: self.camera.previewStream)
-                await handler.handleCameraPreviews(delegate: self)
-            }
-            
-            Task {
-                let handler = SnapshotsHandler(titleTrackingModel: model, stream: self.camera.photoStream)
-                await handler.handleCameraPhotos(delegate: self)
-            }
-            
-            self.isRunning = true
+    init() {
+        let model = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
+        
+        Task {
+            let handler = PreviewHandler(titleTrackingModel: model, stream: self.camera.previewStream)
+            await handler.handleCameraPreviews(delegate: self)
+        }
+        
+        Task {
+            let handler = SnapshotsHandler(titleTrackingModel: model, stream: self.camera.photoStream)
+            await handler.handleCameraPhotos(delegate: self)
         }
     }
     
+    func startCamera() async {
+        await camera.start()
+    }
+    
+    func stopCamera() {
+        camera.stop()
+    }
+    
     // Change zoom factor
-    // Thread safe
     func zoom(zoomFactor: CGFloat) {
         camera.zoom(zoomFactor: zoomFactor)
     }
     
-    // Thread safe
     func captureImage() {
-        if camera.isPreviewPaused {
-            return // we are already taking a picture. once it is processed preview will resume
-        }
-        
-        camera.pause() // pause viewfinder video so still picture does not feel jumping when ready
         camera.captureImage()
     }
     
@@ -79,10 +65,6 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
     }
     
     func nextPhotoFrame(capturedMovieTitle: CGImage?, text: [String]) async {
-        defer {
-            camera.resume()
-        }
-        
         if AppConfig.Debug.kShowCapturedMovieTitleCrop {
             await debugShowCapturedTitle(capturedMovieTitle, text)
         } else {
@@ -91,6 +73,8 @@ final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotH
                 showWebView = true
             }
         }
+        
+        await camera.start()
     }
     
     // Used for debugging purposes. Show cropped image of the captured movie title
