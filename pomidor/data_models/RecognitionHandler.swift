@@ -23,9 +23,7 @@ actor RecognitionHandler {
                                     heightFactor: AppConfig.OCR.kDetectedAreaHeightScale)
         
         let recognition = await recognizeText(cgImage: cgImage, orientation: orientation, regionOfInterest: detection)
-        
         let words = recognition.map{ $0.first?.lowercased() ?? "" }
-        
         return (detection, words.joined(separator: " "))
     }
     
@@ -52,7 +50,6 @@ actor RecognitionHandler {
             } catch {
                 continuation.resume(returning: [])
             }
-
         }
     }
     

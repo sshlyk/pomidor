@@ -38,16 +38,20 @@ final actor CameraDataModel: ObservableObject {
     
     private func consumeCameraPreview() async {
         var frameCount = 0
-        var movieBoxes: [CGRect]?
         
         for await image in camera.previewStream {
             defer { frameCount += 1 }
+            
+            var movieBoxes: [CGRect]?
             let orientation = currentOrientation
             
             if frameCount > AppConfig.ML.kFramesBetweenMovieBoxTracking {
                 movieBoxes = await recognitionHandler?.detectMovieBox(cgImage: image, orientation: orientation)
                 frameCount = 0
             }
+            
+            movieBoxes = movieBoxes?.map { $0.scale(widthFactor: AppConfig.OCR.kDetectedAreaWidthScale,
+                                                    heightFactor: AppConfig.OCR.kDetectedAreaHeightScale)}
 
             await setPreview(image: image, orientation: orientation, movieBoxes: movieBoxes)
         }
@@ -96,10 +100,12 @@ final actor CameraDataModel: ObservableObject {
     
     @MainActor
     private func setPreview(image: CGImage, orientation: CameraSensorOrientation, movieBoxes: [CGRect]?) async {
-        rectBoxes.boxes = movieBoxes?
-            .map{ $0.rotateToMatch(imageOrientation: orientation) }
-            // UI image will be rotated left (by specifying original rotation is right), as a result, rotate boxes to the left
-            .map { NormalizedTextBox($0.rotateToMatch(imageOrientation: .left)) } ?? []
+        if let boxes = movieBoxes {
+            rectBoxes.boxes = movieBoxes?
+                .map{ $0.rotateToMatch(imageOrientation: orientation) }
+                // UI image will be rotated left (by specifying original rotation is right), as a result, rotate boxes to the left
+                .map { NormalizedTextBox($0.rotateToMatch(imageOrientation: .left)) } ?? []
+        }
         previewImage = Image(decorative: image, scale: 1, orientation: .right)
     }
     
