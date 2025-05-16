@@ -3,9 +3,7 @@ import SwiftUI
 struct ViewfinderView: View {
     @Binding var image: Image?
     @ObservedObject var boxes: TextBoxes
-    
-    // TODO Temp variable to display recognized movie title as string for dev purposes
-    @Binding var movieTitle: String
+    @Binding var infoText: String
     
     var body: some View {
         GeometryReader { geometry in
@@ -17,7 +15,7 @@ struct ViewfinderView: View {
                 }
             }
             .overlay{
-                Text(movieTitle)
+                Text(infoText)
                     .font(.largeTitle)
                     .background(.white.opacity(0.8))
                     .cornerRadius(10)
@@ -37,7 +35,7 @@ struct ViewfinderView_Previews: PreviewProvider {
         ViewfinderView(
             image: .constant(Image(systemName: "pencil")),
             boxes: TextBoxes(),
-            movieTitle: .constant("Movie Title")
+            infoText: .constant("Movie Title")
         )
     }
 }

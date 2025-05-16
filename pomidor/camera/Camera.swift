@@ -5,109 +5,87 @@ import os.log
 
 fileprivate let logger = Logger(subsystem: "pomidor", category: "Camera")
 
-class Camera: NSObject {
+actor Camera {
+    let previewStream: AsyncStream<CGImage>
+    let photoStream: AsyncStream<CGImage>
+    
     private let captureSession = AVCaptureSession()
-    private let dispatchQueue: DispatchQueue = DispatchQueue(label: "camera queue")
+    private let photoCaptureDelegate: PhotoCaptureDelegate
+    private let previewCaptureDelegate: PreviewCaptureDelegate
+    private let videoPreviewDelegateQueue = DispatchQueue(label: "video queue delegate")
     
-    let previewStream: AsyncStream<PreviewCapture>
-    private let previewStreamContinuation: AsyncStream<PreviewCapture>.Continuation
-    
-    let photoStream: AsyncStream<CameraCapture>
-    private let photoStreamContinuation: AsyncStream<CameraCapture>.Continuation
-    
-    private var cameraSensorOrientation: CameraSensorOrientation?
     private var photoOutput: AVCapturePhotoOutput?
     private var captureDevice: AVCaptureDevice?
-    
-    deinit {
-        // terminate stream that publish preview images and taken photos
-        previewStreamContinuation.finish()
-        photoStreamContinuation.finish()
-    }
+    private var cameraSensorOrientation: CameraSensorOrientation?
         
-    override init() {
-        (previewStream, previewStreamContinuation) = AsyncStream<PreviewCapture>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        (photoStream, photoStreamContinuation) = AsyncStream<CameraCapture>.makeStream(bufferingPolicy: .bufferingNewest(1))
-
-        super.init()
+    init() {
+        let (previewStream, previewStreamContinuation) = AsyncStream<CGImage>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let (photoStream, photoStreamContinuation) = AsyncStream<CGImage>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        
+        photoCaptureDelegate = PhotoCaptureDelegate(photoStreamContinuation)
+        previewCaptureDelegate = PreviewCaptureDelegate(previewStreamContinuation)
+        
+        self.previewStream = previewStream
+        self.photoStream = photoStream
     }
     
-    // Public APIs. Must be thread safe -------------------------
+    // Public APIs
         
     func start() async {
-        return await withCheckedContinuation { continuation in
-            dispatchQueue.async {
-                Task {
-                    defer { continuation.resume() }
-                    
-                    guard await self.checkAuthorization() else {
-                        logger.error("Camera access was not authorized.")
-                        return
-                    }
-                    
-                    guard self.configureCaptureSession() else {
-                        return
-                    }
-                    
-                    if !self.captureSession.isRunning {
-                        self.captureSession.startRunning()
-                    }
-                    
-                    self.updateForDeviceOrientation()
-                }
-            }
+        guard await self.checkAuthorization() else {
+            logger.error("Camera access was not authorized.")
+            return
         }
-    }
-    
-    func stop() {
-        dispatchQueue.async {
-            guard self.captureSession.isRunning else { return }
-            self.captureSession.stopRunning()
-        }
-    }
-    
-    func captureImage() {
-        
-        dispatchQueue.async {
-            guard let photoOutput = self.photoOutput else { return }
-            
-            var photoSettings = AVCapturePhotoSettings()
 
-            if photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
-                photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+        if self.captureDevice == nil {
+            guard configureCaptureSession() else {
+                return
             }
-            
-            photoSettings.flashMode = AppConfig.Camera.kDisableFlashMode ? .off : .auto
-            photoSettings.isHighResolutionPhotoEnabled = AppConfig.Camera.kEnableHighResolution
+        }
+
+        if !self.captureSession.isRunning {
+            self.captureSession.startRunning()
+        }
+    }
+    
+    func stop() async {
+        guard self.captureSession.isRunning else { return }
+        self.captureSession.stopRunning()
+    }
+    
+    func captureImage() async {
+        guard let photoOutput = photoOutput else { return }
+        
+        var photoSettings = AVCapturePhotoSettings()
+
+        if photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
+            photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+        }
+        
+        photoSettings.flashMode = AppConfig.Camera.kDisableFlashMode ? .off : .auto
+        photoSettings.isHighResolutionPhotoEnabled = AppConfig.Camera.kEnableHighResolution
 //            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
 //                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
 //            }
-            photoSettings.photoQualityPrioritization = AppConfig.Camera.kPhotoQuality
-            photoOutput.capturePhoto(with: photoSettings, delegate: self)
-        }
+        photoSettings.photoQualityPrioritization = AppConfig.Camera.kPhotoQuality
+        photoOutput.capturePhoto(with: photoSettings, delegate: photoCaptureDelegate)
     }
     
-    func zoom(zoomFactor: CGFloat) {
-        dispatchQueue.async {
-            do {
-                guard let device = self.captureDevice else {
-                    return
-                }
-                
-                try device.lockForConfiguration()
-                device.videoZoomFactor = max(1, min(zoomFactor, device.activeFormat.videoMaxZoomFactor))
-                device.unlockForConfiguration()
-            } catch {
-                logger.error("Failed to set video zoom factor \(zoomFactor)")
-            }
+    func zoom(zoomFactor: CGFloat) async {
+        guard let device = captureDevice else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            device.videoZoomFactor = max(1, min(zoomFactor, device.activeFormat.videoMaxZoomFactor))
+            device.unlockForConfiguration()
+        } catch {
+            logger.error("Failed to set video zoom factor \(zoomFactor)")
         }
     }
     
     // Private APIs -------------------------
     
     private func configureCaptureSession() -> Bool {
-        if self.captureDevice != nil { return true }
-        
         // it is probably best to try camera with optical zoom first. if not found, system default camera is used
         let availableCaptureDevices = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.builtInTelephotoCamera],
@@ -124,8 +102,10 @@ class Camera: NSObject {
         }
         
         let photoOutput = AVCapturePhotoOutput()
+
         let videoOutput = AVCaptureVideoDataOutput()
-        videoOutput.setSampleBufferDelegate(self, queue: dispatchQueue)
+        
+        videoOutput.setSampleBufferDelegate(previewCaptureDelegate, queue: videoPreviewDelegateQueue)
   
         guard captureSession.canAddInput(deviceInput) else {
             logger.error("Unable to add device input to capture session.")
@@ -147,17 +127,9 @@ class Camera: NSObject {
         captureSession.addOutput(videoOutput)
         self.captureSession.commitConfiguration()
         
-        self.photoOutput = photoOutput
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(updateForDeviceOrientation),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil
-        )
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        
         self.captureDevice = device
+        self.photoOutput = photoOutput
+
         return true
     }
     
@@ -179,59 +151,49 @@ class Camera: NSObject {
             return false
         }
     }
-    
-    @objc
-    private func updateForDeviceOrientation() {
-        switch UIDevice.current.orientation {
-        case .portrait: cameraSensorOrientation = .right
-        case .portraitUpsideDown: cameraSensorOrientation = .left
-        case .landscapeLeft: cameraSensorOrientation = .up
-        case .landscapeRight: cameraSensorOrientation = .down
-        case .unknown, .faceUp, .faceDown: logger.info("Ignoring new device orientation")
-        @unknown default: logger.error("Unknown device orientation detected")
-        }
-        
-        // if we can not camera orientation based on device, use screen
-        cameraSensorOrientation = cameraSensorOrientation ?? UIScreen.main.orientation
-    }
 }
 
-extension Camera: AVCapturePhotoCaptureDelegate {
+fileprivate class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let continuation: AsyncStream<CGImage>.Continuation
+    
+    init(_ continuation: AsyncStream<CGImage>.Continuation) {
+        self.continuation = continuation
+    }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        // by default, this delegate is dispatched on main queue
+        assert(Thread.isMainThread)
+        
         if let error = error {
             logger.error("Error capturing photo: \(error.localizedDescription)")
             return
         }
         
-        photoStreamContinuation.yield(CameraCapture(photo: photo, orientation: cameraSensorOrientation))
+        guard let cgImage = photo.cgImageRepresentation() else {
+            logger.error("Could not convert AVCapturePhoto to CGImage")
+            return
+        }
+        
+        continuation.yield(cgImage)
     }
 }
 
-extension Camera: AVCaptureVideoDataOutputSampleBufferDelegate {
+class PreviewCaptureDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    private let continuation: AsyncStream<CGImage>.Continuation
+    private var orientation: CameraSensorOrientation?
+    
+    init(_ continuation: AsyncStream<CGImage>.Continuation) {
+        self.continuation = continuation
+    }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        assert(!Thread.isMainThread)
         guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
 
-        previewStreamContinuation.yield(PreviewCapture(image: CIImage(cvPixelBuffer: pixelBuffer), orientation: cameraSensorOrientation))
-    }
-}
-
-fileprivate extension UIScreen {
-    // If camera orientation can not be obtained from device orientation, use screen orientation as a backup
-    var orientation: CameraSensorOrientation {
-        let point = coordinateSpace.convert(CGPoint.zero, to: fixedCoordinateSpace)
-        if point == CGPoint.zero {
-            return .right
-        } else if point.x != 0 && point.y != 0 {
-            return .left
-        } else if point.x == 0 && point.y != 0 {
-            return .up
-        } else if point.x != 0 && point.y == 0 {
-            return .down
-        } else {
-            return .up
-        }
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        guard let cgImage = CIContext().createCGImage(ciImage, from: ciImage.extent) else { return }
+        
+        continuation.yield(cgImage)
     }
 }
 

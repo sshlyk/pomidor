@@ -1,21 +1,36 @@
 import Vision
+import CoreImage
 
 struct MLHelpers {
-    static func createObjectTrackingRequest(
-        model: VNCoreMLModel,
-        _ handler: @escaping ([CGRect]) -> Void) -> VNCoreMLRequest
-    {
+    
+    static func detectMovieBox(cgImage: CGImage, orientation: CameraSensorOrientation, model: VNCoreMLModel) -> [CGRect]? {
+        
+        var result: [CGRect]?
+        
         let request = VNCoreMLRequest(model: model) { request, error in
             if let observations = request.results as? [VNRecognizedObjectObservation] {
-                handler(observations.map {$0.boundingBox })
+                result = observations.map {$0.boundingBox }
             }
         }
         
-        // image can be rotated or region of interest selected
-        //request?.imageCropAndScaleOption = .scaleFillRotate90CCW
-        //request?.regionOfInterest = ...
+        try? VNImageRequestHandler(
+            cgImage: cgImage,
+            orientation: CGImagePropertyOrientation(orientation)
+        ).perform([request])
         
-        return request
+        return result
+    }
+}
+
+// Image transformation needed relative to camera physical position when photo was taken to correctly pass it to ML
+extension CGImagePropertyOrientation {
+    init(_ cameraOrientation: CameraSensorOrientation) {
+        switch cameraOrientation {
+        case .up: self = .up
+        case .down: self = .down
+        case .right: self = .right
+        case .left: self = .left
+        }
     }
 }
 

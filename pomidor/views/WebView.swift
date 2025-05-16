@@ -7,7 +7,6 @@ struct WebViewContainer: UIViewRepresentable {
     let url: String
     let webView: WebView
 
-
     func makeUIView(context: Context) -> WKWebView {
         webView.loadView()
         

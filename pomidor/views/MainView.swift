@@ -11,7 +11,7 @@ struct MainView: View {
         
         NavigationStack {
             GeometryReader { geometry in
-                ViewfinderView(image:  $model.viewfinderImage, boxes: model.textBoxes, movieTitle: $model.movieName)
+                ViewfinderView(image:  $model.previewImage, boxes: model.rectBoxes, infoText: $model.infoText)
                     .overlay(alignment: .bottom) {
                         buttonsView()
                             .frame(height: geometry.size.height * Self.barHeightFactor)
@@ -20,8 +20,8 @@ struct MainView: View {
                     .background(.black)
             }.gesture(
                 MagnifyGesture()
-                    .onChanged { model.zoom(zoomFactor: clampZoomFactor($0.magnification)) }
-                    .onEnded { currentZoom = clampZoomFactor($0.magnification) }
+                    .onChanged { change in Task { await model.zoom(zoomFactor: clampZoomFactor(change.magnification)) } }
+                    .onEnded { change in Task { currentZoom = clampZoomFactor(change.magnification) }  }
             )
             .task {
                 await model.startCamera()
@@ -32,7 +32,7 @@ struct MainView: View {
             .ignoresSafeArea()
             .statusBar(hidden: true)
             .onDisappear {
-                model.stopCamera()
+                Task { await model.stopCamera() }
             }
         }
     }
@@ -43,7 +43,7 @@ struct MainView: View {
             Spacer()
             
             Button {
-                model.captureImage()
+                Task { await model.captureImage() }
             } label: {
                 Label {
                     Text("Take Photo")

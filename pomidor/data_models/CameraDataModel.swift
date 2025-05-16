@@ -5,96 +5,122 @@ import Vision
 
 fileprivate let logger = Logger(subsystem: "pomidor", category: "DataModel")
 
-final class CameraDataModel: ObservableObject, PreviewHandlerDelegate, SnapshotHandlerDelegate {
+final actor CameraDataModel: ObservableObject {
+    @MainActor @Published var previewImage: Image?
+    @MainActor @Published var rectBoxes: TextBoxes = TextBoxes()
+    @MainActor @Published var infoText: String = ""
+    @MainActor @Published var showWebView: Bool = false
+    @MainActor @Published var webViewSearchQuery: String = ""
+    
     private let camera = Camera()
-    private let dispatchQueue = DispatchQueue(label: "Camera model queue")
-    
-    @Published var viewfinderImage: Image?
-    @Published var textBoxes: TextBoxes = TextBoxes()
-    @Published var movieName: String = ""
-    
-    @Published var showWebView: Bool = false
-    var webViewSearchQuery: String = ""
+    private let movieTitlePositionModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
+    var currentOrientation: CameraSensorOrientation = .right // portrait mode. TODO better way to detect/set it
     
     init() {
-        let model = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
+        Task { await UIDevice.current.beginGeneratingDeviceOrientationNotifications() }
+        Task { await self.consumeCameraPreview() }
+        Task { await self.consumePhotoStream() }
         
-        Task {
-            let handler = PreviewHandler(titleTrackingModel: model, stream: self.camera.previewStream)
-            await handler.handleCameraPreviews(delegate: self)
+        // track device orientation. if self is destroyed, the loop in this task will exit
+        Task { @MainActor [weak self] in 
+            for await notification in NotificationCenter.default.notifications(named: UIDevice.orientationDidChangeNotification) {
+                guard let strongSelf = self, let orientation = (notification.object as? UIDevice)?.orientation else { return }
+                Task { await strongSelf.setOrientation(deviceOrientation: orientation) }
+            }
         }
+    }
+    
+    private func consumeCameraPreview() async {
+        var frameCount = 0
+        var movieBoxes: [CGRect]?
         
-        Task {
-            let handler = SnapshotsHandler(titleTrackingModel: model, stream: self.camera.photoStream)
-            await handler.handleCameraPhotos(delegate: self)
+        for await image in camera.previewStream {
+            defer { frameCount += 1 }
+            let orientation = currentOrientation
+            
+            if let model = movieTitlePositionModel, frameCount > AppConfig.ML.kFramesBetweenMovieBoxTracking {
+                movieBoxes = MLHelpers.detectMovieBox(cgImage: image, orientation: orientation, model: model)
+                frameCount = 0
+            }
+
+            await setPreview(image: image, orientation: orientation, movieBoxes: movieBoxes)
         }
+    }
+    
+    private func consumePhotoStream() async {
+        guard let model = movieTitlePositionModel else { return }
+        
+        for await image in camera.photoStream {
+            let orientation = currentOrientation
+            
+            let result = RecognitionHandler.handleCameraPhotos(cgImage: image, orientation: orientation, model: model)
+            guard let (detection, title) = result else {
+                await setFoundMovie(result: nil)
+                continue
+            }
+            
+            if AppConfig.Debug.kShowCapturedMovieTitleCrop {
+                let cropRect =  detection.rotateToMatch(imageOrientation: orientation).toImageCoordinates(cgImage: image)
+                guard let crop = image.cropping(to: cropRect) else {
+                    await setFoundMovie(result: nil)
+                    continue
+                }
+                
+                await camera.stop()
+                await setPreview(image: crop, orientation: orientation, movieBoxes: nil)
+                try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
+                await camera.start()
+                
+            } else {
+                await setFoundMovie(result: title)
+            }
+        }
+    }
+    
+    @MainActor
+    private func setFoundMovie(result: String?) {
+        if let movieTitle = result {
+            webViewSearchQuery = movieTitle
+            showWebView = true
+            infoText = ""
+        } else {
+            infoText = AppConfig.UI.kNotFoundText
+        }
+    }
+    
+    @MainActor
+    private func setPreview(image: CGImage, orientation: CameraSensorOrientation, movieBoxes: [CGRect]?) async {
+        rectBoxes.boxes = movieBoxes?
+            .map{ $0.rotateToMatch(imageOrientation: orientation) }
+            // UI image will be rotated left (by specifying original rotation is right), as a result, rotate boxes to the left
+            .map { NormalizedTextBox($0.rotateToMatch(imageOrientation: .left)) } ?? []
+        previewImage = Image(decorative: image, scale: 1, orientation: .right)
     }
     
     func startCamera() async {
         await camera.start()
     }
     
-    func stopCamera() {
-        camera.stop()
+    func stopCamera() async {
+        await camera.stop()
     }
     
-    // Change zoom factor
-    func zoom(zoomFactor: CGFloat) {
-        camera.zoom(zoomFactor: zoomFactor)
+    func zoom(zoomFactor: CGFloat) async {
+        await camera.zoom(zoomFactor: zoomFactor)
     }
     
-    func captureImage() {
-        camera.captureImage()
+    func captureImage() async {
+        await camera.captureImage()
     }
     
-    func nextPreviewFrame(capture: PreviewCapture, detections: [CGRect]?) async {
-        guard let previewCgImage = capture.image.cgImage else { return }
-        
-        let transformedDetections = capture.orientation.flatMap { orientation in
-            detections?.map { $0.rotateToMatch(imageOrientation: orientation) }
-        }
-        
-        Task { @MainActor in
-            // Display image. The image is currently rotated left when rendered
-            // Text boxes needs to be rotated to the left
-            viewfinderImage =  Image(decorative: previewCgImage, scale: 1, orientation: .right)
-            textBoxes.boxes = transformedDetections?.map {
-                NormalizedTextBox($0.rotateToMatch(imageOrientation: .left))
-            } ?? []
-        }
-    }
-    
-    func nextPhotoFrame(capturedMovieTitle: CGImage?, text: [String]) async {
-        if AppConfig.Debug.kShowCapturedMovieTitleCrop {
-            await debugShowCapturedTitle(capturedMovieTitle, text)
-        } else {
-            Task { @MainActor in
-                webViewSearchQuery = text.joined(separator: " ")
-                showWebView = true
-            }
-        }
-        
-        await camera.start()
-    }
-    
-    // Used for debugging purposes. Show cropped image of the captured movie title
-    private func debugShowCapturedTitle(_ capturedMovieTitle: CGImage?, _ text: [String]) async {
-        Task { @MainActor in
-            textBoxes.boxes = []
-            if let title = capturedMovieTitle {
-                if AppConfig.Debug.kShowCapturedMovieTitleCrop {
-                    viewfinderImage =  Image(decorative: title, scale: 1, orientation: .right)
-                }
-                movieName = text.joined(separator: " ")
-            } else {
-                movieName = AppConfig.UI.kNotFoundText
-            }
-        }
-        
-        try? await Task.sleep(nanoseconds: AppConfig.UI.kSnapDelaySec * 1_000_000_000)
-        
-        Task { @MainActor in
-            movieName = ""
+    private func setOrientation(deviceOrientation: UIDeviceOrientation) async {
+        switch deviceOrientation {
+        case .portrait: currentOrientation = .right
+        case .portraitUpsideDown: currentOrientation = .left
+        case .landscapeLeft: currentOrientation = .up
+        case .landscapeRight: currentOrientation = .down
+        case .unknown, .faceUp, .faceDown: logger.info("Ignoring new device orientation")
+        @unknown default: logger.error("Unknown device orientation detected")
         }
     }
 }
