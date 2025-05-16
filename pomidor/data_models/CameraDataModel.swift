@@ -13,10 +13,16 @@ final actor CameraDataModel: ObservableObject {
     @MainActor @Published var webViewSearchQuery: String = ""
     
     private let camera = Camera()
-    private let movieTitlePositionModel = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model)
-    var currentOrientation: CameraSensorOrientation = .right // portrait mode. TODO better way to detect/set it
+    private let recognitionHandler: RecognitionHandler?
+    private var currentOrientation: CameraSensorOrientation = .right // portrait mode. TODO better way to detect/set it
     
     init() {
+        if let model = try? VNCoreMLModel(for: MovieTitlePosition(configuration: .init()).model) {
+            recognitionHandler = RecognitionHandler(movieBoxModel: model)
+        } else {
+            recognitionHandler = nil
+        }
+        
         Task { await UIDevice.current.beginGeneratingDeviceOrientationNotifications() }
         Task { await self.consumeCameraPreview() }
         Task { await self.consumePhotoStream() }
@@ -38,8 +44,8 @@ final actor CameraDataModel: ObservableObject {
             defer { frameCount += 1 }
             let orientation = currentOrientation
             
-            if let model = movieTitlePositionModel, frameCount > AppConfig.ML.kFramesBetweenMovieBoxTracking {
-                movieBoxes = MLHelpers.detectMovieBox(cgImage: image, orientation: orientation, model: model)
+            if frameCount > AppConfig.ML.kFramesBetweenMovieBoxTracking {
+                movieBoxes = await recognitionHandler?.detectMovieBox(cgImage: image, orientation: orientation)
                 frameCount = 0
             }
 
@@ -48,12 +54,12 @@ final actor CameraDataModel: ObservableObject {
     }
     
     private func consumePhotoStream() async {
-        guard let model = movieTitlePositionModel else { return }
+        guard let handler = recognitionHandler else { return }
         
         for await image in camera.photoStream {
             let orientation = currentOrientation
             
-            let result = RecognitionHandler.handleCameraPhotos(cgImage: image, orientation: orientation, model: model)
+            let result = await handler.handleCameraPhotos(cgImage: image, orientation: orientation)
             guard let (detection, title) = result else {
                 await setFoundMovie(result: nil)
                 continue
