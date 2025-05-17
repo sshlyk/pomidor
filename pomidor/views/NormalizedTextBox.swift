@@ -13,6 +13,7 @@ struct NormalizedTextBox: Shape, Identifiable {
     }
     
     func path(in imageCoord: CGRect) -> Path {
-        return Path(NormalizedRect(normalizedRect: rect).toImageCoordinates(imageCoord.size, origin: .upperLeft))
+        let imageArea = NormalizedRect(normalizedRect: rect).toImageCoordinates(imageCoord.size, origin: .upperLeft);
+        return Path(roundedRect: imageArea, cornerRadius: 3)
     }
 }
