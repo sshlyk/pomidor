@@ -23,7 +23,7 @@ struct AppConfig {
     
     struct ML {
         // number of frames skipped before next one passed to movie title tracking model
-        static let kFramesBetweenMovieBoxTracking = 4
+        static let kFramesBetweenMovieBoxTracking = 0
     }
     
     struct UI {
