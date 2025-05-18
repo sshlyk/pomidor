@@ -89,7 +89,7 @@ final actor CameraDataModel: ObservableObject {
     
     @MainActor
     private func setFoundMovie(result: String?) {
-        if let movieTitle = result {
+        if let movieTitle = result, !movieTitle.isEmpty {
             webViewSearchQuery = movieTitle
             showWebView = true
             infoText = ""

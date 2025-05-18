@@ -2,7 +2,6 @@ import SwiftUI
 
 struct MainView: View {
     @StateObject private var model = CameraDataModel()
-    private let webView = WebView()
     @State private var currentZoom: CGFloat = 1
     
     private static let barHeightFactor = 0.15
@@ -59,7 +58,7 @@ struct MainView: View {
                 }
             }
             .navigationDestination(isPresented: $model.showWebView) {
-                WebViewContainer(query: model.webViewSearchQuery, webView: webView)
+                WebView(query: model.webViewSearchQuery)
             }
             
             Spacer()
