@@ -59,7 +59,7 @@ struct MainView: View {
                 }
             }
             .navigationDestination(isPresented: $model.showWebView) {
-                WebViewContainer(url: model.webViewSearchQuery, webView: webView)
+                WebViewContainer(query: model.webViewSearchQuery, webView: webView)
             }
             
             Spacer()

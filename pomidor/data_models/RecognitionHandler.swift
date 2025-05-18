@@ -27,9 +27,9 @@ actor RecognitionHandler {
         return (detection, words.joined(separator: " "))
     }
     
-    private func recognizeText(cgImage: CGImage,
-                                      orientation: CameraSensorOrientation,
-                                      regionOfInterest: CGRect) async -> [[String]] {
+    func recognizeText(cgImage: CGImage,
+                       orientation: CameraSensorOrientation,
+                       regionOfInterest: CGRect) async -> [[String]] {
         await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest() { (request: VNRequest, error: Error?) in
                 let observations = request.results as? [VNRecognizedTextObservation]
@@ -38,7 +38,7 @@ actor RecognitionHandler {
             }
             
             request.automaticallyDetectsLanguage = AppConfig.OCR.kAutomaticallyDetectLanguages
-            request.recognitionLanguages = AppConfig.OCR.kRecognizedLanguages.map { $0.identifier }
+            request.recognitionLanguages = AppConfig.OCR.kRecognizedLanguages
             request.recognitionLevel = AppConfig.OCR.kRecognitionLevel
             request.usesLanguageCorrection = AppConfig.OCR.kUseLanguageCorrection
             request.minimumTextHeight = AppConfig.OCR.kMinTextHight

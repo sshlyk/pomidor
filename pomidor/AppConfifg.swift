@@ -3,10 +3,9 @@ import AVFoundation
 import Vision
 
 struct AppConfig {
-    typealias Language = Locale.LanguageCode
     
     struct OCR {
-        static let kRecognizedLanguages: [Language] = [.english]
+        static let kRecognizedLanguages: [String] = ["en-US"]
         static let kRecognitionLevel: VNRequestTextRecognitionLevel = .accurate
         static let kUseLanguageCorrection = true
         static let kMinTextHight: Float = 0.1 // relative to image (NOTE: only active if accuracy is set to "fast")

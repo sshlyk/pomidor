@@ -4,13 +4,14 @@ import WebKit
 
 struct WebViewContainer: UIViewRepresentable {
     
-    let url: String
+    let query: String
     let webView: WebView
 
     func makeUIView(context: Context) -> WKWebView {
         webView.loadView()
         
-        if let myURL = URL(string: AppConfig.UI.kMovieSearchBaseURL.appending(url)) {
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? query
+        if let myURL = URL(string: AppConfig.UI.kMovieSearchBaseURL.appending(encodedQuery)) {
             webView.webView.load(URLRequest(url: myURL))
         }
         

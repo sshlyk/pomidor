@@ -101,10 +101,10 @@ final actor CameraDataModel: ObservableObject {
     @MainActor
     private func setPreview(image: CGImage, orientation: CameraSensorOrientation, movieBoxes: [CGRect]?) async {
         if let boxes = movieBoxes {
-            rectBoxes.boxes = movieBoxes?
+            rectBoxes.boxes = boxes
                 .map{ $0.rotateToMatch(imageOrientation: orientation) }
                 // UI image will be rotated left (by specifying original rotation is right), as a result, rotate boxes to the left
-                .map { NormalizedTextBox($0.rotateToMatch(imageOrientation: .left)) } ?? []
+                .map { NormalizedTextBox($0.rotateToMatch(imageOrientation: .left)) }
         }
         previewImage = Image(decorative: image, scale: 1, orientation: .right)
     }
