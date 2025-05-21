@@ -2,28 +2,35 @@ import UIKit
 import SwiftUI
 import WebKit
 
-struct WebView: UIViewRepresentable {
+struct WebViewContainer: UIViewRepresentable {
     
     let query: String
-    let webView: WKWebView
-    
-    init(query: String) {
-        self.query = query
-        let webConfiguration = WKWebViewConfiguration()
-        webView = WKWebView(frame: .zero, configuration: webConfiguration)
-        webView.allowsBackForwardNavigationGestures = true
-    }
+    let webView: WebView
 
     func makeUIView(context: Context) -> WKWebView {
+        webView.loadView()
+        
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? query
         if let myURL = URL(string: AppConfig.UI.kMovieSearchBaseURL.appending(encodedQuery)) {
-            webView.load(URLRequest(url: myURL))
+            webView.webView.load(URLRequest(url: myURL))
         }
         
-        return webView
+        return webView.webView
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
         
+    }
+}
+
+class WebView: UIViewController, WKUIDelegate {
+    
+    var webView: WKWebView!
+    
+    override func loadView() {
+        let webConfiguration = WKWebViewConfiguration()
+        webView = WKWebView(frame: .zero, configuration: webConfiguration)
+        webView.uiDelegate = self
+        view = webView
     }
 }
