@@ -22,7 +22,7 @@ struct AppConfig {
     
     struct ML {
         // number of frames skipped before next one passed to movie title tracking model
-        static let kFramesBetweenMovieBoxTracking = 0
+        static let kFramesBetweenMovieBoxTracking = 1
     }
     
     struct UI {
@@ -30,6 +30,7 @@ struct AppConfig {
         static let kSnapDelaySec:UInt64 = 2 // delay after snapshot is taken to display the result
         static let kMovieSearchBaseURL = "https://www.google.com/search?q=imdb+"
         static let kMaxZoomFactor: CGFloat = 10 // pinch to zoom. Capturing device will enforce own maximum
+        static let kMaxFramesSinceBoxLost = 4 // maximum number of frames to keep box on a screen after detection is lost
     }
     
     struct Debug {

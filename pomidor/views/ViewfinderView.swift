@@ -10,8 +10,8 @@ struct ViewfinderView: View {
             image?
             .resizable()
             .overlay {
-                ForEach($boxes.boxes) { $box in
-                    box.stroke(.red, lineWidth: 2)
+                ForEach($boxes.boxes, id: \CGRect.self) { $box in
+                    RectShape(box).stroke(.red, lineWidth: 2)
                 }
             }
             .overlay{

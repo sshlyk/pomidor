@@ -38,6 +38,7 @@ final actor CameraDataModel: ObservableObject {
     
     private func consumeCameraPreview() async {
         var frameCount = 0
+        var framesSinceBoxLost = 0
         
         for await image in camera.previewStream {
             defer { frameCount += 1 }
@@ -48,8 +49,19 @@ final actor CameraDataModel: ObservableObject {
             if frameCount > AppConfig.ML.kFramesBetweenMovieBoxTracking {
                 movieBoxes = await recognitionHandler?.detectMovieBox(cgImage: image, orientation: orientation)
                 frameCount = 0
+                if movieBoxes?.isEmpty ?? true {
+                    framesSinceBoxLost += 1
+                } else {
+                    framesSinceBoxLost = 0
+                }
             }
             
+            // delay removing tracking box for couple frames after movie title is no longer detected
+            if 1...AppConfig.UI.kMaxFramesSinceBoxLost ~= framesSinceBoxLost {
+                movieBoxes = nil
+            }
+            
+            // boost detected area
             movieBoxes = movieBoxes?.map { $0.scale(widthFactor: AppConfig.OCR.kDetectedAreaWidthScale,
                                                     heightFactor: AppConfig.OCR.kDetectedAreaHeightScale)}
 
@@ -104,7 +116,7 @@ final actor CameraDataModel: ObservableObject {
             rectBoxes.boxes = boxes
                 .map{ $0.rotateToMatch(imageOrientation: orientation) }
                 // UI image will be rotated left (by specifying original rotation is right), as a result, rotate boxes to the left
-                .map { NormalizedTextBox($0.rotateToMatch(imageOrientation: .left)) }
+                .map { $0.rotateToMatch(imageOrientation: .left) }
         }
         previewImage = Image(decorative: image, scale: 1, orientation: .right)
     }

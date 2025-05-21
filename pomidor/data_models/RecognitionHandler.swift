@@ -15,7 +15,7 @@ actor RecognitionHandler {
     
     func handleCameraPhotos(cgImage: CGImage, orientation: CameraSensorOrientation) async -> (CGRect, String?)? {
         // for now we only consider one detection if multiple are found
-        guard var detection = await detectMovieBox(cgImage: cgImage, orientation: orientation)?.first else {
+        guard var detection = await detectMovieBox(cgImage: cgImage, orientation: orientation).first else {
             return nil
         }
         
@@ -53,13 +53,13 @@ actor RecognitionHandler {
         }
     }
     
-    func detectMovieBox(cgImage: CGImage, orientation: CameraSensorOrientation) async -> [CGRect]? {
+    func detectMovieBox(cgImage: CGImage, orientation: CameraSensorOrientation) async -> [CGRect] {
         await withCheckedContinuation { continuation in
 
             let request = VNCoreMLRequest(model: movieBoxModel) { request, error in
                 let observations = request.results as? [VNRecognizedObjectObservation]
                 let result = observations?.map {$0.boundingBox }
-                continuation.resume(returning: result)
+                continuation.resume(returning: result ?? [])
             }
             
             do {
@@ -67,7 +67,7 @@ actor RecognitionHandler {
                     .perform([request])
             } catch {
                 logger.error("Failed to submit movie box request to a VNImageRequestHandler")
-                continuation.resume(returning: nil)
+                continuation.resume(returning: [])
             }
         }
     }

@@ -1,11 +1,7 @@
 import SwiftUI
 import Vision
 
-struct NormalizedTextBox: Shape, Identifiable {
-    var id: String {
-        rect.debugDescription // TODO do better for id
-    }
-    
+struct RectShape: Shape {
     private let rect: CGRect
     
     init(_ normalizedRect: CGRect) {
