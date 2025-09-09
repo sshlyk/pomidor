@@ -1,7 +1,11 @@
 # Pomidor app
 Get movie score when browsing streaming services on TV with one click
 
-![alt text](pomidor/screenshot.jpeg "Title")
+
+<p float="left">
+<img src="screenshot.jpeg" height="600">
+<img src="screenshot-2.jpeg" height="600">
+</p>
 
 Current state:
 * Identify and highlight movie title region using Apple Vision and custom ML model
